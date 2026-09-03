@@ -89,18 +89,6 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Group Delete', 'group_name' => 'Group Management Permissions'],
             ['name' => 'Group Toggle Status', 'group_name' => 'Group Management Permissions'],
 
-            /* Application Management */
-            ['name' => 'Application Index', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Create', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Update', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Delete', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Toggle Status', 'group_name' => 'Application Management Permissions'],
-
-            /* Module Management */
-            ['name' => 'Module Index', 'group_name' => 'Module Management Permissions'],
-            ['name' => 'Module Create', 'group_name' => 'Module Management Permissions'],
-            ['name' => 'Module Update', 'group_name' => 'Module Management Permissions'],
-            ['name' => 'Module Delete', 'group_name' => 'Module Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
