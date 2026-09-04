@@ -26,6 +26,7 @@ class Employee extends Model
         'branch_id',
         'department_id',
         'designation_id',
+        'channel_wise_employment_id',
         'employee_type',
         'id_type',
         'id_number',
@@ -152,6 +153,14 @@ class Employee extends Model
     public function designation(): BelongsTo
     {
         return $this->belongsTo(Designation::class);
+    }
+
+    /**
+     * Get the channel wise employment associated with the employee.
+     */
+    public function channelWiseEmployment(): BelongsTo
+    {
+        return $this->belongsTo(ChannelWiseEmployment::class);
     }
 
     /**

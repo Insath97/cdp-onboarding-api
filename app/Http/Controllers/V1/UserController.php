@@ -123,6 +123,7 @@ class UserController extends Controller implements HasMiddleware
                     'region_id' => $data['region_id'] ?? null,
                     'province_id' => $data['province_id'] ?? null,
                     'designation_id' => $data['designation_id'] ?? null,
+                    'channel_wise_employment_id' => $data['channel_wise_employment_id'] ?? null,
                     'reporting_manager_id' => $data['reporting_manager_id'] ?? null,
                 ];
 
@@ -303,6 +304,7 @@ class UserController extends Controller implements HasMiddleware
                     'region_id',
                     'province_id',
                     'designation_id',
+                    'channel_wise_employment_id',
                     'reporting_manager_id'
                 ]));
 
@@ -345,6 +347,7 @@ class UserController extends Controller implements HasMiddleware
                 'employee.province',
                 'employee.reportingManager.user',
                 'employee.designation',
+                'employee.channelWiseEmployment',
                 'roles',
                 'permissions',
             ]);

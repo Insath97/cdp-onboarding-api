@@ -45,6 +45,7 @@ class UpdateUserRequest extends FormRequest
             'region_id' => 'nullable|exists:regions,id',
             'province_id' => 'nullable|exists:provinces,id',
             'designation_id' => 'nullable|exists:designations,id',
+            'channel_wise_employment_id' => 'nullable|exists:channel_wise_employments,id',
             'reporting_manager_id' => 'nullable|exists:employees,id',
 
             'is_active' => 'sometimes|boolean',

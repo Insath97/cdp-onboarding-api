@@ -36,7 +36,7 @@ class DesignationController extends Controller implements HasMiddleware
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $query = Designation::with(['department', 'channelWiseEmployment']);
+            $query = Designation::with(['department']);
 
             // Apply Search Scope if search parameter is present
             if ($request->has('search') && $request->search != '') {
@@ -45,10 +45,6 @@ class DesignationController extends Controller implements HasMiddleware
 
             if ($request->has('department_id')) {
                 $query->where('department_id', $request->department_id);
-            }
-
-            if ($request->has('channel_wise_employment_id')) {
-                $query->where('channel_wise_employment_id', $request->channel_wise_employment_id);
             }
 
             if ($request->has('is_active')) {
@@ -87,7 +83,7 @@ class DesignationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Designation created successfully',
-                'data' => $designation->load(['department', 'channelWiseEmployment']),
+                'data' => $designation->load(['department']),
             ], 201);
         } catch (\Throwable $th) {
             return response()->json([
@@ -104,7 +100,7 @@ class DesignationController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $designation = Designation::with(['department', 'channelWiseEmployment'])->find($id);
+            $designation = Designation::with(['department'])->find($id);
 
             if (! $designation) {
                 return response()->json([
@@ -156,7 +152,7 @@ class DesignationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Designation updated successfully',
-                'data' => $designation->load(['department', 'channelWiseEmployment']),
+                'data' => $designation->load(['department']),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -212,13 +208,9 @@ class DesignationController extends Controller implements HasMiddleware
                 $query->where('department_id', $request->department_id);
             }
 
-            if ($request->has('channel_wise_employment_id')) {
-                $query->where('channel_wise_employment_id', $request->channel_wise_employment_id);
-            }
-
             $designations = $query->orderBy('order_weight', 'desc')
                                   ->orderBy('name', 'asc')
-                                  ->get(['id', 'name', 'code', 'department_id', 'channel_wise_employment_id', 'level', 'order_weight']);
+                                  ->get(['id', 'name', 'code', 'department_id', 'level', 'order_weight']);
 
             return response()->json([
                 'status' => 'success',

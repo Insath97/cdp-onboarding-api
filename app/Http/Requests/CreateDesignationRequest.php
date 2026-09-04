@@ -27,7 +27,6 @@ class CreateDesignationRequest extends FormRequest
             'name' => 'required|string|max:255',
             'code' => 'required|string|unique:designations,code|max:10',
             'department_id' => 'required|exists:departments,id',
-            'channel_wise_employment_id' => 'nullable|exists:channel_wise_employments,id',
             'level' => 'required|in:entry,mid,senior,lead,executive,Manager,Director',
             'description' => 'nullable|string',
             'is_active' => 'sometimes|boolean',

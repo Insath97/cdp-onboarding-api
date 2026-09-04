@@ -45,10 +45,10 @@ class ChannelWiseEmployment extends Model
     }
 
     /**
-     * Get the designations associated with the channel wise employment.
+     * Get the employees associated with the channel wise employment.
      */
-    public function designations(): HasMany
+    public function employees(): HasMany
     {
-        return $this->hasMany(Designation::class);
+        return $this->hasMany(Employee::class);
     }
 }
