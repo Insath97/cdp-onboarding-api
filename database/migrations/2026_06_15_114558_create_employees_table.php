@@ -27,6 +27,7 @@ return new class extends Migration
             $table->foreignId('branch_id')->nullable()->constrained('branches')->nullOnDelete();
             $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->foreignId('designation_id')->constrained('designations')->cascadeOnDelete();
+            $table->foreignId('channel_wise_employment_id')->nullable()->constrained('channel_wise_employments')->nullOnDelete();
             
             $table->enum('employee_type', ['permanent', 'contract', 'internship', 'probation']);
             $table->enum('id_type', ['nic', 'passport', 'driving_license', 'other']);
