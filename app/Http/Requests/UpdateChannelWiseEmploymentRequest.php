@@ -6,23 +6,39 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
-class SSOIntrospectRequest extends FormRequest
+class UpdateChannelWiseEmploymentRequest extends FormRequest
 {
+    /**
+     * Determine if the user is authorized to make this request.
+     */
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     */
     public function rules(): array
     {
+        $id = $this->route('channel_wise_employment') ?? $this->route('id');
+
         return [
-            'token' => 'required|string',
+            'name' => 'sometimes|string|max:255|unique:channel_wise_employments,name,' . $id,
+            'description' => 'nullable|string',
+            'is_active' => 'sometimes|boolean',
         ];
     }
 
+    /**
+     * Handle a failed validation attempt.
+     */
     protected function failedValidation(Validator $validator)
     {
         $errorMessages = $validator->errors();
+
         $fieldErrors = collect($errorMessages->getMessages())->map(function ($messages, $field) {
             return [
                 'field' => $field,
@@ -31,11 +47,10 @@ class SSOIntrospectRequest extends FormRequest
         })->values();
 
         $message = $fieldErrors->count() > 1
-            ? 'There are multiple validation errors.'
+            ? 'There are multiple validation errors. Please review the form and correct the issues.'
             : 'There is an issue with the input for ' . $fieldErrors->first()['field'] . '.';
 
         throw new HttpResponseException(response()->json([
-            'status' => 'error',
             'message' => $message,
             'errors' => $fieldErrors,
         ], 422));

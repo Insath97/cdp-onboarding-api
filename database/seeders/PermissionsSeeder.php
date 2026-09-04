@@ -89,6 +89,13 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Group Delete', 'group_name' => 'Group Management Permissions'],
             ['name' => 'Group Toggle Status', 'group_name' => 'Group Management Permissions'],
 
+            /* Channel Wise Employment Management */
+            ['name' => 'Channel Wise Employment Index', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Create', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Update', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Delete', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Toggle Status', 'group_name' => 'Channel Wise Employment Management Permissions'],
+
         ];
 
         foreach ($permissions as $permission) {

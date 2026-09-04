@@ -12,14 +12,13 @@ use App\Http\Controllers\V1\BranchController;
 use App\Http\Controllers\V1\DesignationController;
 use App\Http\Controllers\V1\CountryController;
 use App\Http\Controllers\V1\GroupController;
-use App\Http\Controllers\V1\SSOController;
+use App\Http\Controllers\V1\ChannelWiseEmploymentController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
 
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
-    Route::post('sso/introspect', [SSOController::class, 'introspect']);
 });
 
 /* protected routes */
@@ -91,5 +90,12 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::prefix('groups')->group(function () {
         Route::get('list', [GroupController::class, 'getActiveList']);
         Route::patch('{id}/toggle-status', [GroupController::class, 'toggleStatus']);
+    });
+
+    // Channel Wise Employments
+    Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
+    Route::prefix('channel-wise-employments')->group(function () {
+        Route::get('list', [ChannelWiseEmploymentController::class, 'getActiveList']);
+        Route::patch('{id}/toggle-status', [ChannelWiseEmploymentController::class, 'toggleStatus']);
     });
 });

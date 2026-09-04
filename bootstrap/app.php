@@ -24,8 +24,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'jwt.refresh' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\RefreshToken::class,
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
-            'admin.auth' => \App\Http\Middleware\AdminAuthMiddleware::class,
-            'customer.auth' => \App\Http\Middleware\CustomerAuthMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
