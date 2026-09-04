@@ -4,6 +4,9 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\ChannelWiseEmployment;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->artisan('db:seed', ['--class' => 'PermissionsSeeder']);
@@ -14,7 +17,7 @@ beforeEach(function () {
             'name' => 'Super Admin User',
             'username' => 'superadmin_test',
             'password' => bcrypt('password'),
-            'user_type' => 'super_admin',
+            'user_type' => 'admin',
             'is_active' => true,
             'can_login' => true,
         ]

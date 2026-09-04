@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Models\Employee;
 
 class AuthController extends Controller
 {
@@ -42,7 +43,7 @@ class AuthController extends Controller
 
             // Fallback: search employee by id_number
             if (!$user) {
-                $employee = \App\Models\Employee::where('id_number', $loginVal)->first();
+                $employee = Employee::where('id_number', $loginVal)->first();
                 if ($employee) {
                     $user = User::where('employee_id', $employee->id)->first();
                 }

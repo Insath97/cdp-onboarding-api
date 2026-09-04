@@ -93,9 +93,9 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     });
 
     // Channel Wise Employments
-    Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
     Route::prefix('channel-wise-employments')->group(function () {
         Route::get('list', [ChannelWiseEmploymentController::class, 'getActiveList']);
         Route::patch('{id}/toggle-status', [ChannelWiseEmploymentController::class, 'toggleStatus']);
     });
+    Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
 });
