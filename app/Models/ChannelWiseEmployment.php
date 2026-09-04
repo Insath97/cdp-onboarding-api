@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ChannelWiseEmployment extends Model
 {
@@ -41,5 +42,13 @@ class ChannelWiseEmployment extends Model
             $q->where('name', 'like', "%{$search}%")
               ->orWhere('description', 'like', "%{$search}%");
         });
+    }
+
+    /**
+     * Get the designations associated with the channel wise employment.
+     */
+    public function designations(): HasMany
+    {
+        return $this->hasMany(Designation::class);
     }
 }

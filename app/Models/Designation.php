@@ -16,6 +16,7 @@ class Designation extends Model
         'name',
         'code',
         'department_id',
+        'channel_wise_employment_id',
         'level',
         'order_weight',
         'description',
@@ -82,6 +83,14 @@ class Designation extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Get the channel wise employment associated with the designation.
+     */
+    public function channelWiseEmployment(): BelongsTo
+    {
+        return $this->belongsTo(ChannelWiseEmployment::class);
     }
 
     /**

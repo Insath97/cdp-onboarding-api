@@ -28,6 +28,7 @@ class UpdateDesignationRequest extends FormRequest
             'name' => 'sometimes|string|max:255',
             'code' => 'sometimes|string|max:10|unique:designations,code,' . $id,
             'department_id' => 'sometimes|exists:departments,id',
+            'channel_wise_employment_id' => 'nullable|exists:channel_wise_employments,id',
             'level' => 'sometimes|in:entry,mid,senior,lead,executive,Manager,Director',
             'description' => 'nullable|string',
             'is_active' => 'sometimes|boolean',

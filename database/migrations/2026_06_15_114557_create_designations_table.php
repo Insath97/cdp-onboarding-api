@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('designations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('department_id')->constrained('departments')->cascadeOnDelete();
+            $table->foreignId('channel_wise_employment_id')->nullable()->constrained('channel_wise_employments')->nullOnDelete();
             $table->string('name');
             $table->string('code')->unique();
             $table->string('level'); // entry, mid, senior, lead, executive, Manager, Director
