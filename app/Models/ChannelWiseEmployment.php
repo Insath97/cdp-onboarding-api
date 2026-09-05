@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ChannelWiseEmployment extends Model
 {
@@ -50,5 +51,23 @@ class ChannelWiseEmployment extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);
+    }
+
+    /**
+     * Get the full history of all Channel Head assignments for this channel.
+     */
+    public function headHistories(): HasMany
+    {
+        return $this->hasMany(ChannelHeadHistory::class);
+    }
+
+    /**
+     * Get only the currently active Channel Head record for this channel.
+     */
+    public function currentHead(): HasOne
+    {
+        return $this->hasOne(ChannelHeadHistory::class)
+                    ->whereNull('effective_to')
+                    ->with('employee.user');
     }
 }

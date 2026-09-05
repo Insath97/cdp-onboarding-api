@@ -26,7 +26,6 @@ class Employee extends Model
         'branch_id',
         'department_id',
         'designation_id',
-        'channel_wise_employment_id',
         'employee_type',
         'id_type',
         'id_number',
@@ -157,10 +156,66 @@ class Employee extends Model
 
     /**
      * Get the channel wise employment associated with the employee.
+     * REMOVED: channel_wise_employment_id no longer exists on employees table.
+     * Channel membership is now determined by walking up the reporting_manager chain
+     * to find a Channel Head in channel_head_histories.
+     * Use resolveChannel() or resolveChannelAsOf($date) instead.
      */
-    public function channelWiseEmployment(): BelongsTo
+
+    /**
+     * Walk up the reporting manager chain to find this employee's current channel.
+     * Returns the active ChannelHeadHistory record, or null if no channel is found.
+     */
+    public function resolveChannel(): ?\App\Models\ChannelHeadHistory
     {
-        return $this->belongsTo(ChannelWiseEmployment::class);
+        $current = $this;
+        $visited = [];
+
+        while ($current) {
+            if (in_array($current->id, $visited)) break;
+            $visited[] = $current->id;
+
+            $headRecord = \App\Models\ChannelHeadHistory::where('employee_id', $current->id)
+                ->whereNull('effective_to')
+                ->with('channel')
+                ->first();
+
+            if ($headRecord) return $headRecord;
+
+            $current = $current->reportingManager;
+        }
+
+        return null;
+    }
+
+    /**
+     * Walk up the reporting manager chain to find this employee's channel AS OF a specific date.
+     * Used when resolving the Channel Head for a candidate's submission date.
+     */
+    public function resolveChannelAsOf(string $date): ?\App\Models\ChannelHeadHistory
+    {
+        $current = $this;
+        $visited = [];
+
+        while ($current) {
+            if (in_array($current->id, $visited)) break;
+            $visited[] = $current->id;
+
+            $headRecord = \App\Models\ChannelHeadHistory::where('employee_id', $current->id)
+                ->where('effective_from', '<=', $date)
+                ->where(function ($q) use ($date) {
+                    $q->whereNull('effective_to')
+                      ->orWhere('effective_to', '>=', $date);
+                })
+                ->with('channel')
+                ->first();
+
+            if ($headRecord) return $headRecord;
+
+            $current = $current->reportingManager;
+        }
+
+        return null;
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Http\Controllers\V1\DesignationController;
 use App\Http\Controllers\V1\CountryController;
 use App\Http\Controllers\V1\GroupController;
 use App\Http\Controllers\V1\ChannelWiseEmploymentController;
+use App\Http\Controllers\V1\ChannelHeadController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -94,8 +95,12 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     // Channel Wise Employments
     Route::prefix('channel-wise-employments')->group(function () {
-        Route::get('list', [ChannelWiseEmploymentController::class, 'getActiveList']);
-        Route::patch('{id}/toggle-status', [ChannelWiseEmploymentController::class, 'toggleStatus']);
+        Route::get('list',                [ChannelWiseEmploymentController::class, 'getActiveList']);
+        Route::patch('{id}/toggle-status',[ChannelWiseEmploymentController::class, 'toggleStatus']);
+        // Channel Head management
+        Route::get('{id}/head',           [ChannelHeadController::class, 'getCurrentHead']);
+        Route::post('{id}/head',          [ChannelHeadController::class, 'assignHead']);
+        Route::get('{id}/head/history',   [ChannelHeadController::class, 'getHistory']);
     });
     Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
 });
