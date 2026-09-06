@@ -44,19 +44,9 @@ class CandidateController extends Controller implements HasMiddleware
     {
         try {
             $perPage = (int) $request->get('per_page', 15);
-            $query = Candidate::with(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name']);
             $user = auth()->user();
-
-            // Channel & Hierarchy visibility scoping (Super Admin bypasses restriction)
-            if (! $user->hasRole('Super Admin')) {
-                $employeeId = $user->employee_id;
-                $query->where(function ($q) use ($user, $employeeId) {
-                    $q->where('uploaded_by', $user->id);
-                    if ($employeeId) {
-                        $q->orWhere('channel_head_employee_id', $employeeId);
-                    }
-                });
-            }
+            $query = Candidate::with(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name'])
+                              ->accessibleBy($user);
 
             // Keyword search filter
             if ($request->filled('search')) {
@@ -177,21 +167,15 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            // Access check for non-Super Admin users
+            // Access check for non-Super Admin users (Channel & Parent/Child hierarchy scoping)
             $user = auth()->user();
-            if (! $user->hasRole('Super Admin')) {
-                $employeeId = $user->employee_id;
-                $isUploader = ($candidate->uploaded_by == $user->id);
-                $isChannelHead = ($employeeId && $candidate->channel_head_employee_id == $employeeId);
+            if (! $candidate->isAccessibleBy($user)) {
+                $this->logActivity('UNAUTHORIZED_ACCESS', 'Candidate', "Unauthorized candidate access attempt on ID: {$id}", ['id' => $id], 'warning');
 
-                if (! $isUploader && ! $isChannelHead) {
-                    $this->logActivity('UNAUTHORIZED_ACCESS', 'Candidate', "Unauthorized candidate access attempt on ID: {$id}", ['id' => $id], 'warning');
-
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Unauthorized access to candidate record',
-                    ], 403);
-                }
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
             }
 
             $this->logActivity('GET_BY_ID', 'Candidate', "Retrieved candidate details for: {$candidate->full_name}", ['candidate_id' => $candidate->id]);
@@ -304,18 +288,8 @@ class CandidateController extends Controller implements HasMiddleware
     public function getCandidateList(Request $request)
     {
         try {
-            $query = Candidate::query();
             $user = auth()->user();
-
-            if (! $user->hasRole('Super Admin')) {
-                $employeeId = $user->employee_id;
-                $query->where(function ($q) use ($user, $employeeId) {
-                    $q->where('uploaded_by', $user->id);
-                    if ($employeeId) {
-                        $q->orWhere('channel_head_employee_id', $employeeId);
-                    }
-                });
-            }
+            $query = Candidate::accessibleBy($user);
 
             $candidates = $query->orderBy('first_name', 'asc')
                                 ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id']);
@@ -351,6 +325,14 @@ class CandidateController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Candidate not found',
                 ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
             }
 
             if (! in_array($candidate->status, ['pending', '1st_interview'])) {
@@ -418,6 +400,14 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 404);
             }
 
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
             if (! in_array($candidate->status, ['pending', '1st_interview'])) {
                 return response()->json([
                     'status' => 'error',
@@ -482,6 +472,14 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 404);
             }
 
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
             if (in_array($candidate->status, ['1st_interview_passed', '1st_interview_rejected', 'final_approved', 'rejected'])) {
                 return response()->json([
                     'status' => 'error',
@@ -543,6 +541,14 @@ class CandidateController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Candidate not found',
                 ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
             }
 
             $approvals = InterviewApproval::with(['actor:id,name,email', 'assignedToUser:id,name,email'])

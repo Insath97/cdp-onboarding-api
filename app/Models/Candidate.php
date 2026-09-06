@@ -120,4 +120,57 @@ class Candidate extends Model
     {
         return $query->where('status', $status);
     }
+
+    /**
+     * Scope query to only include candidates accessible by the given user based on channel & reporting manager hierarchy.
+     */
+    public function scopeAccessibleBy($query, User $user)
+    {
+        if ($user->hasRole('Super Admin')) {
+            return $query;
+        }
+
+        $employeeId = $user->employee_id;
+        $descendantUserIds = $user->getAllDescendantIds();
+        $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
+
+        return $query->where(function ($q) use ($user, $employeeId, $allowedUserIds) {
+            // 1. Uploaded by self or any subordinate in reporting manager hierarchy
+            $q->whereIn('uploaded_by', $allowedUserIds);
+
+            // 2. Channel Head for candidate's channel
+            if ($employeeId) {
+                $q->orWhere('channel_head_employee_id', $employeeId);
+            }
+
+            // 3. Assigned to user in workflow approvals
+            $q->orWhereHas('approvals', function ($approvalQuery) use ($user) {
+                $approvalQuery->where('assigned_to_user_id', $user->id);
+            });
+        });
+    }
+
+    /**
+     * Check if a single candidate instance is accessible by the given user.
+     */
+    public function isAccessibleBy(User $user): bool
+    {
+        if ($user->hasRole('Super Admin')) {
+            return true;
+        }
+
+        $employeeId = $user->employee_id;
+        $descendantUserIds = $user->getAllDescendantIds();
+        $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
+
+        if (in_array($this->uploaded_by, $allowedUserIds)) {
+            return true;
+        }
+
+        if ($employeeId && $this->channel_head_employee_id == $employeeId) {
+            return true;
+        }
+
+        return $this->approvals()->where('assigned_to_user_id', $user->id)->exists();
+    }
 }
