@@ -4,12 +4,15 @@ namespace App\Http\Controllers\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Traits\ActivityLogTrait;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 
 class ActivityLogController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     /**
      * Define the middleware for this controller.
      */
