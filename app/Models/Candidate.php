@@ -93,6 +93,14 @@ class Candidate extends Model
     }
 
     /**
+     * Get all interview approval and workflow tracking records for this candidate.
+     */
+    public function approvals(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(InterviewApproval::class)->orderBy('created_at', 'asc');
+    }
+
+    /**
      * Scope a query to search across first_name, last_name, nic_number, and phone_number.
      */
     public function scopeSearch($query, string $search)

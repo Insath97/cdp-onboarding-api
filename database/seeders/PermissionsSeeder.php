@@ -105,6 +105,9 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Candidate Show', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Update', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Delete', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Assign 1st Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Approve 1st Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Reject 1st Interview', 'group_name' => 'Candidate Management Permissions'],
 
         ];
 

@@ -5,8 +5,12 @@ namespace App\Http\Controllers\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateCandidateRequest;
 use App\Http\Requests\UpdateCandidateRequest;
+use App\Http\Requests\Assign1stInterviewRequest;
+use App\Http\Requests\Approve1stInterviewRequest;
+use App\Http\Requests\Reject1stInterviewRequest;
 use App\Models\Candidate;
 use App\Models\ChannelHeadHistory;
+use App\Models\InterviewApproval;
 use App\Traits\ActivityLogTrait;
 use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
@@ -23,10 +27,13 @@ class CandidateController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Candidate Index', ['only' => ['index', 'show', 'getCandidateList']]),
+            new Middleware('permission:Candidate Index', ['only' => ['index', 'show', 'getCandidateList', 'getApprovals']]),
             new Middleware('permission:Candidate Create', ['only' => ['store']]),
             new Middleware('permission:Candidate Update', ['only' => ['update']]),
             new Middleware('permission:Candidate Delete', ['only' => ['destroy']]),
+            new Middleware('permission:Candidate Assign 1st Interview', ['only' => ['assign1stInterview']]),
+            new Middleware('permission:Candidate Approve 1st Interview', ['only' => ['approve1stInterview']]),
+            new Middleware('permission:Candidate Reject 1st Interview', ['only' => ['reject1stInterview']]),
         ];
     }
 
@@ -324,6 +331,236 @@ class CandidateController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve candidate list',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Assign/delegate the 1st interview to another user.
+     */
+    public function assign1stInterview(Assign1stInterviewRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('ASSIGN_1ST_INTERVIEW_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            if (! in_array($candidate->status, ['pending', '1st_interview'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate cannot be assigned at current stage (status: {$candidate->status})",
+                ], 422);
+            }
+
+            $data = $request->validated();
+            $user = auth()->user();
+
+            InterviewApproval::create([
+                'candidate_id'        => $candidate->id,
+                'actor_id'            => $user->id,
+                'assigned_to_user_id' => $data['assigned_to_user_id'],
+                'stage'               => '1st_interview',
+                'action'              => 'assigned',
+                'assigned_date'       => $data['assigned_date'],
+                'comments'            => $data['comments'],
+                'status'              => 'pending',
+            ]);
+
+            $candidate->status = '1st_interview';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.assignedToUser:id,name,email']);
+
+            $this->logActivity(
+                'ASSIGN_1ST_INTERVIEW',
+                'Candidate',
+                "Assigned 1st interview for candidate {$candidate->full_name} to user ID {$data['assigned_to_user_id']}",
+                ['candidate_id' => $candidate->id, 'assigned_to_user_id' => $data['assigned_to_user_id']]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => '1st interview assigned successfully',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to assign 1st interview',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve 1st interview (candidate passes to 2nd interview stage).
+     */
+    public function approve1stInterview(Approve1stInterviewRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('APPROVE_1ST_INTERVIEW_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            if (! in_array($candidate->status, ['pending', '1st_interview'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "1st interview cannot be approved for candidate with status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+            $user = auth()->user();
+
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => '1st_interview',
+                'action'         => 'approved',
+                'interview_date' => $data['interview_date'],
+                'comments'       => $data['comments'],
+                'status'         => 'completed',
+            ]);
+
+            $candidate->status = '1st_interview_passed';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'APPROVE_1ST_INTERVIEW',
+                'Candidate',
+                "Approved 1st interview for candidate: {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'interview_date' => $data['interview_date']]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => '1st interview approved successfully. Candidate passed to Stage 2.',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to approve 1st interview',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Reject 1st interview (candidate fails 1st interview).
+     */
+    public function reject1stInterview(Reject1stInterviewRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('REJECT_1ST_INTERVIEW_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            if (in_array($candidate->status, ['1st_interview_passed', '1st_interview_rejected', 'final_approved', 'rejected'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate cannot be rejected from status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+            $user = auth()->user();
+
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => '1st_interview',
+                'action'         => 'rejected',
+                'interview_date' => $data['interview_date'],
+                'comments'       => $data['comments'],
+                'status'         => 'rejected',
+            ]);
+
+            $candidate->status = '1st_interview_rejected';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'REJECT_1ST_INTERVIEW',
+                'Candidate',
+                "Rejected 1st interview for candidate: {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'interview_date' => $data['interview_date']],
+                'warning'
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => '1st interview rejected successfully',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reject 1st interview',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get full interview approval audit trail for a candidate.
+     */
+    public function getApprovals(string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $approvals = InterviewApproval::with(['actor:id,name,email', 'assignedToUser:id,name,email'])
+                                          ->where('candidate_id', $id)
+                                          ->orderBy('created_at', 'asc')
+                                          ->get();
+
+            $this->logActivity('GET_APPROVALS', 'Candidate', "Retrieved interview approval history for candidate ID: {$id}", ['candidate_id' => $id]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate approval history retrieved successfully',
+                'data' => $approvals,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve approval history',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }
