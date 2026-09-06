@@ -69,6 +69,13 @@ class ActivityLogController extends Controller implements HasMiddleware
 
             $logs = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
+            $this->logActivity(
+                'GET_ALL',
+                'ActivityLog',
+                'Retrieved activity logs list',
+                $request->only(['search', 'module', 'action', 'user_id', 'level', 'date_from', 'date_to', 'per_page', 'page'])
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Activity logs retrieved successfully',
@@ -92,11 +99,15 @@ class ActivityLogController extends Controller implements HasMiddleware
             $log = ActivityLog::with('user:id,name,email')->find($id);
 
             if (! $log) {
+                $this->logActivity('GET_BY_ID_FAILED', 'ActivityLog', "Activity log not found with ID: {$id}", ['id' => $id], 'warning');
+
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Activity log not found',
                 ], 404);
             }
+
+            $this->logActivity('GET_BY_ID', 'ActivityLog', "Retrieved activity log details for ID: {$id}", ['id' => $id]);
 
             return response()->json([
                 'status' => 'success',
