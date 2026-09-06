@@ -65,7 +65,7 @@ class Candidate extends Model
             return null;
         }
 
-        return asset('storage/' . $this->cv_path);
+        return asset($this->cv_path);
     }
 
     /**

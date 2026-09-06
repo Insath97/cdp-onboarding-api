@@ -8,14 +8,14 @@ use App\Http\Requests\UpdateCandidateRequest;
 use App\Models\Candidate;
 use App\Models\ChannelHeadHistory;
 use App\Traits\ActivityLogTrait;
+use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
-use Illuminate\Support\Facades\Storage;
 
 class CandidateController extends Controller implements HasMiddleware
 {
-    use ActivityLogTrait;
+    use ActivityLogTrait, FileUploadTrait;
 
     /**
      * Define the middleware for this controller.
@@ -98,9 +98,10 @@ class CandidateController extends Controller implements HasMiddleware
             $data = $request->validated();
             $user = auth()->user();
 
-            // 1. Upload CV file to public storage
-            if ($request->hasFile('cv_file')) {
-                $data['cv_path'] = $request->file('cv_file')->store('cvs', 'public');
+            // 1. Upload CV file using FileUploadTrait
+            $cvPath = $this->handleFileUpload($request, 'cv_file', null, 'candidates', 'cv_' . time());
+            if ($cvPath) {
+                $data['cv_path'] = $cvPath;
             }
 
             // 2. Set submission parameters
@@ -221,12 +222,10 @@ class CandidateController extends Controller implements HasMiddleware
 
             $data = $request->validated();
 
-            // Replace CV file if new file uploaded
-            if ($request->hasFile('cv_file')) {
-                if ($candidate->cv_path && Storage::disk('public')->exists($candidate->cv_path)) {
-                    Storage::disk('public')->delete($candidate->cv_path);
-                }
-                $data['cv_path'] = $request->file('cv_file')->store('cvs', 'public');
+            // Replace CV file if new file uploaded using FileUploadTrait
+            $cvPath = $this->handleFileUpload($request, 'cv_file', $candidate->cv_path, 'candidates', 'cv_' . time());
+            if ($cvPath) {
+                $data['cv_path'] = $cvPath;
             }
 
             $candidate->update($data);
@@ -272,10 +271,8 @@ class CandidateController extends Controller implements HasMiddleware
 
             $candidateName = $candidate->full_name;
 
-            // Delete CV file from storage
-            if ($candidate->cv_path && Storage::disk('public')->exists($candidate->cv_path)) {
-                Storage::disk('public')->delete($candidate->cv_path);
-            }
+            // Delete CV file using FileUploadTrait
+            $this->deleteFile($candidate->cv_path);
 
             $candidate->delete();
 
