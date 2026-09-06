@@ -14,6 +14,7 @@ use App\Http\Controllers\V1\CountryController;
 use App\Http\Controllers\V1\GroupController;
 use App\Http\Controllers\V1\ChannelWiseEmploymentController;
 use App\Http\Controllers\V1\ChannelHeadController;
+use App\Http\Controllers\V1\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -103,4 +104,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('{id}/head/history',   [ChannelHeadController::class, 'getHistory']);
     });
     Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
+
+    // Activity Logs
+    Route::apiResource('activity-logs', ActivityLogController::class)->only(['index', 'show']);
 });
