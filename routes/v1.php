@@ -15,6 +15,7 @@ use App\Http\Controllers\V1\GroupController;
 use App\Http\Controllers\V1\ChannelWiseEmploymentController;
 use App\Http\Controllers\V1\ChannelHeadController;
 use App\Http\Controllers\V1\ActivityLogController;
+use App\Http\Controllers\V1\CandidateController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -107,4 +108,10 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     // Activity Logs
     Route::apiResource('activity-logs', ActivityLogController::class)->only(['index', 'show']);
+
+    // Candidates (Stage 0 Registration)
+    Route::prefix('candidates')->group(function () {
+        Route::get('list', [CandidateController::class, 'getCandidateList']);
+    });
+    Route::apiResource('candidates', CandidateController::class);
 });

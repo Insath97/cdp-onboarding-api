@@ -99,6 +99,13 @@ class PermissionsSeeder extends Seeder
             /* Activity Log Management */
             ['name' => 'Activity Log Index', 'group_name' => 'Activity Log Management Permissions'],
 
+            /* Candidate Management */
+            ['name' => 'Candidate Index', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Create', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Show', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Update', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Delete', 'group_name' => 'Candidate Management Permissions'],
+
         ];
 
         foreach ($permissions as $permission) {
