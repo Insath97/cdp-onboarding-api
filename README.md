@@ -232,8 +232,7 @@ cdp-onboarding-api/
 │   ├── Traits/
 │   │   ├── ActivityLogTrait.php            # Audit logging with fallback
 │   │   └── FileUploadTrait.php             # File upload/delete helpers
-│   └── Utilities/
-│       └── NumberToWords.php               # Number-to-words converter
+
 ├── bootstrap/
 │   └── app.php                             # Middleware registration, exception handling
 ├── config/

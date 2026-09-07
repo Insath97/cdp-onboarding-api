@@ -9,6 +9,8 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
+use App\Http\Middleware\SanitizeInput;
+use App\Http\Middleware\SecurityHeaders;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,12 +20,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->api(append: [
+            SanitizeInput::class,
+            SecurityHeaders::class,
+        ]);
+
         $middleware->alias([
             'auth' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\Authenticate::class,
             'jwt.auth' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\Authenticate::class,
             'jwt.refresh' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\RefreshToken::class,
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
+            'sanitize.input' => SanitizeInput::class,
+            'security.headers' => SecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
