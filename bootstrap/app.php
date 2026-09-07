@@ -9,6 +9,10 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
+use App\Http\Middleware\SanitizeInput;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ForceHttps;
+use Illuminate\Http\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,14 +22,21 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->api(append: [
+            ForceHttps::class,
+            SanitizeInput::class,
+            SecurityHeaders::class,
+            ThrottleRequests::class.':60,1',
+        ]);
+
         $middleware->alias([
             'auth' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\Authenticate::class,
             'jwt.auth' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\Authenticate::class,
             'jwt.refresh' => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\RefreshToken::class,
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
-            'admin.auth' => \App\Http\Middleware\AdminAuthMiddleware::class,
-            'customer.auth' => \App\Http\Middleware\CustomerAuthMiddleware::class,
+            'sanitize.input' => SanitizeInput::class,
+            'security.headers' => SecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

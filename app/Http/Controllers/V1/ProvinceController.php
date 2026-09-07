@@ -35,7 +35,7 @@ class ProvinceController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = Province::with('country');
 
             // Apply Search Scope if search parameter is present

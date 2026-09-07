@@ -6,7 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
-class UpdateApplicationRequest extends FormRequest
+class Approve1stInterviewRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,14 +15,19 @@ class UpdateApplicationRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('application');
-
         return [
-            'name' => 'sometimes|string|max:255',
-            'code' => 'sometimes|string|max:255|unique:applications,code,' . $id,
-            'description' => 'nullable|string',
-            'app_url' => 'nullable|string|max:255',
-            'is_active' => 'sometimes|boolean',
+            'interview_date' => 'required|date|date_format:Y-m-d',
+            'comments'       => 'required|string|max:1000',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'interview_date.required'    => 'Please provide the 1st interview date.',
+            'interview_date.date'        => 'The interview date must be a valid date.',
+            'interview_date.date_format' => 'The interview date must match the format YYYY-MM-DD.',
+            'comments.required'          => 'Please provide interview feedback/comments.',
         ];
     }
 
@@ -30,10 +35,7 @@ class UpdateApplicationRequest extends FormRequest
     {
         $errorMessages = $validator->errors();
         $fieldErrors = collect($errorMessages->getMessages())->map(function ($messages, $field) {
-            return [
-                'field' => $field,
-                'messages' => $messages,
-            ];
+            return ['field' => $field, 'messages' => $messages];
         })->values();
 
         $message = $fieldErrors->count() > 1
@@ -42,7 +44,7 @@ class UpdateApplicationRequest extends FormRequest
 
         throw new HttpResponseException(response()->json([
             'message' => $message,
-            'errors' => $fieldErrors,
+            'errors'  => $fieldErrors,
         ], 422));
     }
 }

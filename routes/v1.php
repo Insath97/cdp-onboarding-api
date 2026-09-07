@@ -12,14 +12,18 @@ use App\Http\Controllers\V1\BranchController;
 use App\Http\Controllers\V1\DesignationController;
 use App\Http\Controllers\V1\CountryController;
 use App\Http\Controllers\V1\GroupController;
-use App\Http\Controllers\V1\SSOController;
+use App\Http\Controllers\V1\ChannelWiseEmploymentController;
+use App\Http\Controllers\V1\ChannelHeadController;
+use App\Http\Controllers\V1\ActivityLogController;
+use App\Http\Controllers\V1\CandidateController;
+use App\Http\Controllers\V1\EmployeeHierarchyController;
+use App\Http\Controllers\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
 
 Route::prefix('v1')->group(function () {
-    Route::post('login', [AuthController::class, 'login']);
-    Route::post('sso/introspect', [SSOController::class, 'introspect']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 });
 
 /* protected routes */
@@ -92,4 +96,52 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('list', [GroupController::class, 'getActiveList']);
         Route::patch('{id}/toggle-status', [GroupController::class, 'toggleStatus']);
     });
+
+    // Channel Wise Employments
+    Route::prefix('channel-wise-employments')->group(function () {
+        Route::get('list',                [ChannelWiseEmploymentController::class, 'getActiveList']);
+        Route::patch('{id}/toggle-status',[ChannelWiseEmploymentController::class, 'toggleStatus']);
+        // Channel Head management
+        Route::get('{id}/head',           [ChannelHeadController::class, 'getCurrentHead']);
+        Route::post('{id}/head',          [ChannelHeadController::class, 'assignHead']);
+        Route::get('{id}/head/history',   [ChannelHeadController::class, 'getHistory']);
+    });
+    Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
+
+    // Employee Hierarchy
+    Route::prefix('employees')->group(function () {
+        Route::get('{id}/manager-history',  [EmployeeHierarchyController::class, 'getHistory']);
+        Route::post('{id}/reassign-manager', [EmployeeHierarchyController::class, 'reassignManager']);
+        Route::get('{id}/hierarchy-as-of',  [EmployeeHierarchyController::class, 'getHierarchyAsOf']);
+    });
+
+    // System Notifications
+    Route::prefix('notifications')->group(function () {
+        Route::get('/',               [NotificationController::class, 'index']);
+        Route::get('unread-count',     [NotificationController::class, 'unreadCount']);
+        Route::patch('{id}/read',     [NotificationController::class, 'markAsRead']);
+        Route::post('mark-all-read',  [NotificationController::class, 'markAllAsRead']);
+        Route::delete('{id}',         [NotificationController::class, 'destroy']);
+    });
+
+    // Activity Logs
+    Route::apiResource('activity-logs', ActivityLogController::class)->only(['index', 'show']);
+
+    // Candidates & Interview Workflow (Stage 0, 1, 2, 3)
+    Route::prefix('candidates')->group(function () {
+        Route::get('list',                       [CandidateController::class, 'getCandidateList']);
+        Route::get('{id}/approvals',             [CandidateController::class, 'getApprovals']);
+        // Stage 1
+        Route::post('{id}/assign-1st-interview', [CandidateController::class, 'assign1stInterview']);
+        Route::post('{id}/approve-1st-interview',[CandidateController::class, 'approve1stInterview']);
+        Route::post('{id}/reject-1st-interview', [CandidateController::class, 'reject1stInterview']);
+        // Stage 2
+        Route::post('{id}/assign-2nd-interview', [CandidateController::class, 'assign2ndInterview']);
+        Route::post('{id}/approve-2nd-interview',[CandidateController::class, 'approve2ndInterview']);
+        Route::post('{id}/reject-2nd-interview', [CandidateController::class, 'reject2ndInterview']);
+        // Stage 3 (Final Approval)
+        Route::post('{id}/approve-final',        [CandidateController::class, 'approveFinal']);
+        Route::post('{id}/reject-final',         [CandidateController::class, 'rejectFinal']);
+    });
+    Route::apiResource('candidates', CandidateController::class);
 });

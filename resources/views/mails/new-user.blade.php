@@ -12,7 +12,7 @@
     <ul>
         <li><strong>Username:</strong> {{ $user['username'] }}</li>
         <li><strong>Email:</strong> {{ $user['email'] }}</li>
-        <li><strong>Password:</strong> {{ $password }}</li>
+        <li><strong>Password:</strong> <em>Check the separate secure message for your password.</em></li>
         @if (isset($role) && !empty($role))
             <li><strong>Role:</strong> {{ $role }}</li>
         @endif

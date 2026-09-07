@@ -12,7 +12,9 @@ use App\Traits\ActivityLogTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -35,7 +37,7 @@ class UserController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = User::with(['employee.branch', 'employee.zonal', 'employee.region', 'employee.province', 'employee.reportingManager.user', 'employee.designation', 'roles', 'permissions']);
 
             if ($request->has('search')) {
@@ -96,7 +98,7 @@ class UserController extends Controller implements HasMiddleware
 
     public function store(CreateUserRequest $request)
     {
-        \Illuminate\Support\Facades\DB::beginTransaction();
+        DB::beginTransaction();
         try {
             $currentUser = auth("api")->user();
             $data = $request->validated();
@@ -127,10 +129,12 @@ class UserController extends Controller implements HasMiddleware
 
                 $employee = Employee::create($employeeData);
 
-                // Set staff credentials automatically to id_number
+                // Generate random password instead of using id_number
+                $generatedPassword = Str::random(12);
+
                 $data['employee_id'] = $employee->id;
                 $data['username'] = $data['id_number'];
-                $data['password'] = Hash::make($data['id_number']);
+                $data['password'] = Hash::make($generatedPassword);
             } else {
                 // For admin users
                 $data['employee_id'] = null;
@@ -144,7 +148,7 @@ class UserController extends Controller implements HasMiddleware
                 $user->assignRole($data['role']);
             }
 
-            \Illuminate\Support\Facades\DB::commit();
+            DB::commit();
 
             // Send Email
             try {
@@ -161,7 +165,7 @@ class UserController extends Controller implements HasMiddleware
                         'user_type' => $user->user_type,
                         'email_verified_at' => $user->email_verified_at,
                     ],
-                    'password' => ($user->user_type === 'staff') ? $data['id_number'] : $request->password,
+                    'password' => ($user->user_type === 'staff') ? $generatedPassword : $request->password,
                     'role' => $data['role'] ?? null,
                     'created_by' => $currentUser ? $currentUser->name : 'System',
                     'login_url' => trim(config('app.frontend_url') ?? config('app.url')),
@@ -214,7 +218,7 @@ class UserController extends Controller implements HasMiddleware
                 'data' => $userData
             ], 201);
         } catch (\Throwable $th) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to create user',
@@ -258,7 +262,7 @@ class UserController extends Controller implements HasMiddleware
 
     public function update(UpdateUserRequest $request, string $id)
     {
-        \Illuminate\Support\Facades\DB::beginTransaction();
+        DB::beginTransaction();
         try {
             $currentUser = auth("api")->user();
             $user = User::find($id);
@@ -310,7 +314,7 @@ class UserController extends Controller implements HasMiddleware
                     $user->employee->update($employeeData);
                 } else {
                     // Create new employee if they were previously an admin
-                    $employee = \App\Models\Employee::create($employeeData);
+                    $employee = Employee::create($employeeData);
                     $data['employee_id'] = $employee->id;
                 }
 
@@ -334,7 +338,7 @@ class UserController extends Controller implements HasMiddleware
                 $user->syncRoles([$data['role']]);
             }
 
-            \Illuminate\Support\Facades\DB::commit();
+            DB::commit();
 
             $user->refresh();
             $user->load([
@@ -344,6 +348,7 @@ class UserController extends Controller implements HasMiddleware
                 'employee.province',
                 'employee.reportingManager.user',
                 'employee.designation',
+                'employee.channelWiseEmployment',
                 'roles',
                 'permissions',
             ]);
@@ -363,7 +368,7 @@ class UserController extends Controller implements HasMiddleware
                 'data' => $userData
             ], 200);
         } catch (\Throwable $th) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to update user',

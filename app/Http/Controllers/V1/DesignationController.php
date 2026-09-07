@@ -35,8 +35,8 @@ class DesignationController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
-            $query = Designation::with('department');
+            $perPage = min((int) $request->get('per_page', 15), 100);
+            $query = Designation::with(['department']);
 
             // Apply Search Scope if search parameter is present
             if ($request->has('search') && $request->search != '') {
@@ -83,7 +83,7 @@ class DesignationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Designation created successfully',
-                'data' => $designation->load('department'),
+                'data' => $designation->load(['department']),
             ], 201);
         } catch (\Throwable $th) {
             return response()->json([
@@ -100,7 +100,7 @@ class DesignationController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $designation = Designation::with('department')->find($id);
+            $designation = Designation::with(['department'])->find($id);
 
             if (! $designation) {
                 return response()->json([
@@ -152,7 +152,7 @@ class DesignationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Designation updated successfully',
-                'data' => $designation->load('department'),
+                'data' => $designation->load(['department']),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -176,6 +176,13 @@ class DesignationController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Designation not found',
                 ], 404);
+            }
+
+            if (!auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete designations'
+                ], 403);
             }
 
             $designationName = $designation->name;

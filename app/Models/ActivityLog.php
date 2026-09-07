@@ -44,4 +44,17 @@ class ActivityLog extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Scope a query to search across description, module, action, and ip_address.
+     */
+    public function scopeSearch($query, string $search)
+    {
+        return $query->where(function ($q) use ($search) {
+            $q->where('description', 'like', "%{$search}%")
+              ->orWhere('module', 'like', "%{$search}%")
+              ->orWhere('action', 'like', "%{$search}%")
+              ->orWhere('ip_address', 'like', "%{$search}%");
+        });
+    }
 }

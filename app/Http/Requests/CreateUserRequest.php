@@ -28,7 +28,7 @@ class CreateUserRequest extends FormRequest
             'name' => 'required|string|max:255',
             'username' => 'required_if:user_type,admin|nullable|string|max:255|unique:users,username',
             'email' => 'nullable|email|max:255|unique:users,email',
-            'password' => 'required_if:user_type,admin|nullable|string|min:8',
+            'password' => 'required_if:user_type,admin|nullable|string|min:8|regex:/[A-Z]/|regex:/[a-z]/|regex:/[0-9]/|regex:/[@$!%*#?&]/',
             'user_type' => 'required|in:admin,staff',
             'role' => 'required|string|exists:roles,name',
 

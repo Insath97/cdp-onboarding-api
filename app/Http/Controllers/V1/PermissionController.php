@@ -9,13 +9,16 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Spatie\Permission\Models\Permission;
+use App\Traits\ActivityLogTrait;
 
 class PermissionController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Permission Index', only: ['index', 'show']),
+            new Middleware('permission:Permission Index', only: ['index', 'show', 'getPermissionList']),
             new Middleware('permission:Permission Create', only: ['store']),
             new Middleware('permission:Permission Update', only: ['update']),
             new Middleware('permission:Permission Delete', only: ['destroy']),
@@ -25,7 +28,7 @@ class PermissionController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
 
             $query = Permission::query();
 
@@ -67,7 +70,7 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve permissions',
-                'error' => $th->getMessage()
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
             ], 500);
         }
     }
@@ -85,6 +88,8 @@ class PermissionController extends Controller implements HasMiddleware
 
             $permission = Permission::create($data);
 
+            $this->logActivity('CREATE', 'Permission', "Created permission: {$permission->name}", $data);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Permission created successfully',
@@ -94,7 +99,7 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to create permission',
-                'error' => $th->getMessage()
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
             ], 500);
         }
     }
@@ -121,7 +126,7 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve permission',
-                'error' => $th->getMessage()
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
             ], 500);
         }
     }
@@ -151,6 +156,8 @@ class PermissionController extends Controller implements HasMiddleware
 
             $permission->update($data);
 
+            $this->logActivity('UPDATE', 'Permission', "Updated permission: {$permission->name}", $data);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Permission updated successfully',
@@ -160,7 +167,7 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to update permission',
-                'error' => $th->getMessage()
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
             ], 500);
         }
     }
@@ -188,7 +195,10 @@ class PermissionController extends Controller implements HasMiddleware
                 ], 422);
             }
 
+            $permissionName = $permission->name;
             $permission->delete();
+
+            $this->logActivity('DELETE', 'Permission', "Deleted permission: {$permissionName}");
 
             return response()->json([
                 'status' => 'success',
@@ -198,7 +208,7 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to delete permission',
-                'error' => $th->getMessage()
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
             ], 500);
         }
     }
@@ -219,7 +229,7 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve permissions',
-                'error' => $th->getMessage()
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
             ], 500);
         }
     }

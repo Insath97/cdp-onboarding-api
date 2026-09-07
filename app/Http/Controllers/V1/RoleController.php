@@ -18,7 +18,7 @@ class RoleController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Role Index', only: ['index', 'show']),
+            new Middleware('permission:Role Index', only: ['index', 'show', 'getAvailableRoles']),
             new Middleware('permission:Role Create', only: ['store']),
             new Middleware('permission:Role Update', only: ['update']),
             new Middleware('permission:Role Delete', only: ['destroy']),
@@ -28,7 +28,7 @@ class RoleController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
 
             $query = Role::with('permissions');
 
@@ -146,6 +146,14 @@ class RoleController extends Controller implements HasMiddleware
                     'message' => 'Role not found',
                     'data' => []
                 ], 404);
+            }
+
+            // Prevent non-Super-Admins from modifying the Super Admin role
+            if ($role->name === 'Super Admin' && !auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can modify the Super Admin role'
+                ], 403);
             }
 
             if (isset($data['name'])) {

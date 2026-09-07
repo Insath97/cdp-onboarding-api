@@ -89,18 +89,38 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Group Delete', 'group_name' => 'Group Management Permissions'],
             ['name' => 'Group Toggle Status', 'group_name' => 'Group Management Permissions'],
 
-            /* Application Management */
-            ['name' => 'Application Index', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Create', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Update', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Delete', 'group_name' => 'Application Management Permissions'],
-            ['name' => 'Application Toggle Status', 'group_name' => 'Application Management Permissions'],
+            /* Channel Wise Employment Management */
+            ['name' => 'Channel Wise Employment Index', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Create', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Update', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Delete', 'group_name' => 'Channel Wise Employment Management Permissions'],
+            ['name' => 'Channel Wise Employment Toggle Status', 'group_name' => 'Channel Wise Employment Management Permissions'],
 
-            /* Module Management */
-            ['name' => 'Module Index', 'group_name' => 'Module Management Permissions'],
-            ['name' => 'Module Create', 'group_name' => 'Module Management Permissions'],
-            ['name' => 'Module Update', 'group_name' => 'Module Management Permissions'],
-            ['name' => 'Module Delete', 'group_name' => 'Module Management Permissions'],
+            /* Activity Log Management */
+            ['name' => 'Activity Log Index', 'group_name' => 'Activity Log Management Permissions'],
+
+            /* Candidate Management */
+            ['name' => 'Candidate Index', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Create', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Show', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Update', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Delete', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Assign 1st Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Approve 1st Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Reject 1st Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Assign 2nd Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Approve 2nd Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Reject 2nd Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Approve Final', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Reject Final', 'group_name' => 'Candidate Management Permissions'],
+
+            /* Employee Hierarchy Management */
+            ['name' => 'Employee Hierarchy View', 'group_name' => 'Employee Hierarchy Management Permissions'],
+            ['name' => 'Employee Hierarchy Reassign', 'group_name' => 'Employee Hierarchy Management Permissions'],
+
+            /* System Notifications Management */
+            ['name' => 'Notification Index', 'group_name' => 'System Notifications Management Permissions'],
+            ['name' => 'Notification Mark Read', 'group_name' => 'System Notifications Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
