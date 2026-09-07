@@ -462,6 +462,14 @@ Authorization: Bearer <jwt_token>
 | `POST` | `/api/v1/candidates/{id}/approve-2nd-interview` | `Candidate Approve 2nd Interview` | Approve 2nd interview (`2nd_interview` -> `2nd_interview_passed`) |
 | `POST` | `/api/v1/candidates/{id}/reject-2nd-interview` | `Candidate Reject 2nd Interview` | Reject 2nd interview (`2nd_interview` -> `2nd_interview_rejected`) |
 
+### Employee Hierarchy
+
+| Method | Endpoint | Permission | Description |
+|--------|----------|------------|-------------|
+| `GET` | `/api/v1/employees/{id}/manager-history` | `Employee Hierarchy View` | Get complete reporting manager history timeline |
+| `POST` | `/api/v1/employees/{id}/reassign-manager` | `Employee Hierarchy Reassign` | Reassign reporting manager with effective date tracking |
+| `GET` | `/api/v1/employees/{id}/hierarchy-as-of` | `Employee Hierarchy View` | Resolve point-in-time hierarchy for a specific date (`?as_of_date=Y-m-d`) |
+
 ### Activity Logs
 
 | Method | Endpoint | Permission | Description |

@@ -218,7 +218,7 @@ class EmployeeHierarchyController extends Controller implements HasMiddleware
                     'direct_subordinates'=> $subordinates,
                     'channel'            => $channelHeadRecord ? [
                         'channel_id'   => $channelHeadRecord->channel_wise_employment_id,
-                        'channel_name' => $channelHeadRecord->channel?->title,
+                        'channel_name' => $channelHeadRecord->channel?->name,
                         'channel_head' => $channelHeadRecord->employee?->full_name,
                     ] : null,
                 ],
