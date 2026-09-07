@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ReassignReportingManagerRequest;
 use App\Models\Employee;
 use App\Models\EmployeeHierarchyHistory;
+use App\Models\User;
+use App\Notifications\ManagerReassignedNotification;
 use App\Traits\ActivityLogTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -83,6 +85,22 @@ class EmployeeHierarchyController extends Controller implements HasMiddleware
             // Update live employee record
             $employee->reporting_manager_id = $newManagerId;
             $employee->save();
+
+            // Dispatch notification to employee and new manager
+            $newManager = $newManagerId ? Employee::find($newManagerId) : null;
+            $actorUser = auth()->user();
+
+            $employeeUser = User::where('employee_id', $employee->id)->first();
+            if ($employeeUser) {
+                $employeeUser->notify(new ManagerReassignedNotification($employee, $newManager, $effectiveFrom, $actorUser));
+            }
+
+            if ($newManager) {
+                $newManagerUser = User::where('employee_id', $newManager->id)->first();
+                if ($newManagerUser && $newManagerUser->id !== ($employeeUser?->id)) {
+                    $newManagerUser->notify(new ManagerReassignedNotification($employee, $newManager, $effectiveFrom, $actorUser));
+                }
+            }
 
             DB::commit();
 

@@ -17,6 +17,7 @@ use App\Http\Controllers\V1\ChannelHeadController;
 use App\Http\Controllers\V1\ActivityLogController;
 use App\Http\Controllers\V1\CandidateController;
 use App\Http\Controllers\V1\EmployeeHierarchyController;
+use App\Http\Controllers\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -112,6 +113,15 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('{id}/manager-history',  [EmployeeHierarchyController::class, 'getHistory']);
         Route::post('{id}/reassign-manager', [EmployeeHierarchyController::class, 'reassignManager']);
         Route::get('{id}/hierarchy-as-of',  [EmployeeHierarchyController::class, 'getHierarchyAsOf']);
+    });
+
+    // System Notifications
+    Route::prefix('notifications')->group(function () {
+        Route::get('/',               [NotificationController::class, 'index']);
+        Route::get('unread-count',     [NotificationController::class, 'unreadCount']);
+        Route::patch('{id}/read',     [NotificationController::class, 'markAsRead']);
+        Route::post('mark-all-read',  [NotificationController::class, 'markAllAsRead']);
+        Route::delete('{id}',         [NotificationController::class, 'destroy']);
     });
 
     // Activity Logs

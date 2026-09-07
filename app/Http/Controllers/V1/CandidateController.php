@@ -16,6 +16,10 @@ use App\Http\Requests\RejectFinalRequest;
 use App\Models\Candidate;
 use App\Models\ChannelHeadHistory;
 use App\Models\InterviewApproval;
+use App\Models\User;
+use App\Notifications\CandidateSubmittedNotification;
+use App\Notifications\CandidateInterviewAssignedNotification;
+use App\Notifications\CandidateStageStatusNotification;
 use App\Traits\ActivityLogTrait;
 use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
@@ -134,6 +138,15 @@ class CandidateController extends Controller implements HasMiddleware
             // 4. Save Candidate
             $candidate = Candidate::create($data);
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name']);
+
+            // 5. Dispatch Notifications
+            $user->notify(new CandidateSubmittedNotification($candidate));
+            if ($channelHeadEmployeeId) {
+                $headUser = User::where('employee_id', $channelHeadEmployeeId)->first();
+                if ($headUser && $headUser->id !== $user->id) {
+                    $headUser->notify(new CandidateSubmittedNotification($candidate));
+                }
+            }
 
             $this->logActivity(
                 'CREATE',
@@ -370,6 +383,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->stage_updated_at = now();
             $candidate->save();
 
+            // Dispatch notification to assigned user
+            $assignedUser = User::find($data['assigned_to_user_id']);
+            if ($assignedUser) {
+                $assignedUser->notify(new CandidateInterviewAssignedNotification($candidate, '1st_interview', $user, $data['assigned_date'], $data['comments']));
+            }
+
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.assignedToUser:id,name,email']);
 
             $this->logActivity(
@@ -442,6 +461,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->stage_updated_at = now();
             $candidate->save();
 
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'approved', '1st_interview', $user, $data['comments']));
+            }
+
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
 
             $this->logActivity(
@@ -513,6 +538,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->status = '1st_interview_rejected';
             $candidate->stage_updated_at = now();
             $candidate->save();
+
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'rejected', '1st_interview', $user, $data['comments']));
+            }
 
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
 
@@ -631,6 +662,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->stage_updated_at = now();
             $candidate->save();
 
+            // Dispatch notification to assigned user
+            $assignedUser = User::find($data['assigned_to_user_id']);
+            if ($assignedUser) {
+                $assignedUser->notify(new CandidateInterviewAssignedNotification($candidate, '2nd_interview', $user, $data['assigned_date'], $data['comments']));
+            }
+
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.assignedToUser:id,name,email']);
 
             $this->logActivity(
@@ -702,6 +739,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->stage_updated_at = now();
             $candidate->save();
 
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'approved', '2nd_interview', $user, $data['comments']));
+            }
+
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
 
             $this->logActivity(
@@ -772,6 +815,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->status = '2nd_interview_rejected';
             $candidate->stage_updated_at = now();
             $candidate->save();
+
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'rejected', '2nd_interview', $user, $data['comments']));
+            }
 
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
 
@@ -845,6 +894,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->stage_updated_at = now();
             $candidate->save();
 
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'approved', 'final_approval', $user, $data['comments']));
+            }
+
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
 
             $this->logActivity(
@@ -915,6 +970,12 @@ class CandidateController extends Controller implements HasMiddleware
             $candidate->status = 'rejected';
             $candidate->stage_updated_at = now();
             $candidate->save();
+
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'rejected', 'final_approval', $user, $data['comments']));
+            }
 
             $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
 
