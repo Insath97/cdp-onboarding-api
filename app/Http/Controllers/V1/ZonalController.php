@@ -35,7 +35,7 @@ class ZonalController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = Zonal::with('province.country');
 
             // Apply Search Scope if search parameter is present
@@ -171,6 +171,14 @@ class ZonalController extends Controller implements HasMiddleware
             }
 
             $zonalName = $zonal->name;
+
+            if (!auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete zonals'
+                ], 403);
+            }
+
             $zonal->delete();
 
             $this->logActivity('DELETE', 'Zonal', "Deleted zonal: {$zonalName}");

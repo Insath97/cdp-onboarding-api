@@ -5,6 +5,7 @@ namespace App\Traits;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 trait FileUploadTrait
 {
@@ -19,33 +20,29 @@ trait FileUploadTrait
             return null;
         }
 
-        // Delete old file if exists
         $this->deleteFile($oldPath);
 
         $file = $request->file($fieldName);
         $extension = $file->getClientOriginalExtension();
 
-        // Generate filename with optional prefix
         $fileName = $prefix
             ? $prefix . '.' . $extension
-            : Str::random(25) . '.' . $extension;
+            : Str::uuid() . '.' . $extension;
 
         $directory = "uploads/{$module}";
         $filePath = "{$directory}/{$fileName}";
 
-        // Create directory if not exists
-        if (!File::exists(public_path($directory))) {
-            File::makeDirectory(public_path($directory), 0755, true);
+        $disk = Storage::disk('private');
+
+        if (!$disk->exists($directory)) {
+            $disk->makeDirectory($directory);
         }
 
-        $file->move(public_path($directory), $fileName);
+        $disk->put($filePath, file_get_contents($file));
 
         return $filePath;
     }
 
-    /**
-     * Handle multiple file uploads
-     */
     public function handleMultipleFileUpload(
         Request $request,
         string $fieldName,
@@ -59,37 +56,35 @@ trait FileUploadTrait
 
         $files = $request->file($fieldName);
 
-        // Ensure it's an array
         if (!is_array($files)) {
             $files = [$files];
         }
 
         $uploadedPaths = [];
+        $disk = Storage::disk('private');
 
         foreach ($files as $index => $file) {
-            // Skip if file is not valid
             if (!$file->isValid()) {
                 continue;
             }
 
             $extension = $file->getClientOriginalExtension();
 
-            // Generate unique filename
             $fileName = $prefix
                 ? $prefix . '_' . ($index + 1) . '.' . $extension
-                : Str::random(25) . '_' . ($index + 1) . '.' . $extension;
+                : Str::uuid() . '_' . ($index + 1) . '.' . $extension;
 
             $directory = "uploads/{$module}";
             $filePath = "{$directory}/{$fileName}";
 
-            // Create directory if not exists
-            $this->createDirectory($directory);
+            if (!$disk->exists($directory)) {
+                $disk->makeDirectory($directory);
+            }
 
-            $file->move(public_path($directory), $fileName);
+            $disk->put($filePath, file_get_contents($file));
             $uploadedPaths[] = $filePath;
         }
 
-        // Delete old files if new ones were uploaded
         if (!empty($uploadedPaths) && !empty($oldPaths)) {
             foreach ($oldPaths as $oldPath) {
                 $this->deleteFile($oldPath);
@@ -99,29 +94,13 @@ trait FileUploadTrait
         return $uploadedPaths;
     }
 
-    /**
-     * Helper method to create directory
-     */
-    private function createDirectory(string $directory): void
-    {
-        if (!File::exists(public_path($directory))) {
-            File::makeDirectory(public_path($directory), 0755, true, true);
-        }
-    }
-
-    /**
-     * Delete a single file
-     */
     public function deleteFile(?string $path): void
     {
-        if ($path && File::exists(public_path($path))) {
-            File::delete(public_path($path));
+        if ($path && Storage::disk('private')->exists($path)) {
+            Storage::disk('private')->delete($path);
         }
     }
 
-    /**
-     * Delete multiple files
-     */
     public function deleteMultipleFiles(array $paths): void
     {
         foreach ($paths as $path) {

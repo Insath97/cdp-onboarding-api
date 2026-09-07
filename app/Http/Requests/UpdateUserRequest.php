@@ -32,7 +32,7 @@ class UpdateUserRequest extends FormRequest
             'name' => 'sometimes|string|max:255',
             'username' => 'sometimes|string|max:255|unique:users,username,' . $id,
             'email' => 'nullable|email|max:255|unique:users,email,' . $id,
-            'password' => 'sometimes|string|min:8',
+            'password' => 'sometimes|string|min:8|regex:/[A-Z]/|regex:/[a-z]/|regex:/[0-9]/|regex:/[@$!%*#?&]/',
             'user_type' => 'sometimes|in:admin,staff',
             'role' => 'sometimes|string|exists:roles,name',
 

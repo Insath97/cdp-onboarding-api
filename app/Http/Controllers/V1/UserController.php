@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -36,7 +37,7 @@ class UserController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = User::with(['employee.branch', 'employee.zonal', 'employee.region', 'employee.province', 'employee.reportingManager.user', 'employee.designation', 'roles', 'permissions']);
 
             if ($request->has('search')) {
@@ -128,10 +129,12 @@ class UserController extends Controller implements HasMiddleware
 
                 $employee = Employee::create($employeeData);
 
-                // Set staff credentials automatically to id_number
+                // Generate random password instead of using id_number
+                $generatedPassword = Str::random(12);
+
                 $data['employee_id'] = $employee->id;
                 $data['username'] = $data['id_number'];
-                $data['password'] = Hash::make($data['id_number']);
+                $data['password'] = Hash::make($generatedPassword);
             } else {
                 // For admin users
                 $data['employee_id'] = null;
@@ -162,7 +165,7 @@ class UserController extends Controller implements HasMiddleware
                         'user_type' => $user->user_type,
                         'email_verified_at' => $user->email_verified_at,
                     ],
-                    'password' => ($user->user_type === 'staff') ? $data['id_number'] : $request->password,
+                    'password' => ($user->user_type === 'staff') ? $generatedPassword : $request->password,
                     'role' => $data['role'] ?? null,
                     'created_by' => $currentUser ? $currentUser->name : 'System',
                     'login_url' => trim(config('app.frontend_url') ?? config('app.url')),

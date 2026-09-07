@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Candidate extends Model
 {
@@ -65,7 +66,7 @@ class Candidate extends Model
             return null;
         }
 
-        return asset($this->cv_path);
+        return Storage::disk('private')->temporaryUrl($this->cv_path, now()->addMinutes(30));
     }
 
     /**

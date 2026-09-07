@@ -35,7 +35,7 @@ class RegionController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = Region::with('zonal.province.country');
 
             // Apply Search Scope if search parameter is present
@@ -171,6 +171,14 @@ class RegionController extends Controller implements HasMiddleware
             }
 
             $regionName = $region->name;
+
+            if (!auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete regions'
+                ], 403);
+            }
+
             $region->delete();
 
             $this->logActivity('DELETE', 'Region', "Deleted region: {$regionName}");

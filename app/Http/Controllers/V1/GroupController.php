@@ -35,7 +35,7 @@ class GroupController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = Group::query();
 
             // Apply Search Scope if search parameter is present
@@ -167,6 +167,14 @@ class GroupController extends Controller implements HasMiddleware
             }
 
             $groupName = $group->name;
+
+            if (!auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete groups'
+                ], 403);
+            }
+
             $group->delete();
 
             $this->logActivity('DELETE', 'Group', "Deleted group: {$groupName}");

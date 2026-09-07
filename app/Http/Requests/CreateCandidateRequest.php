@@ -32,7 +32,7 @@ class CreateCandidateRequest extends FormRequest
             'secondary_number'  => 'nullable|string|max:30',
             'designation_id'    => 'required|integer|exists:designations,id',
             'expected_salary'   => 'required|numeric|min:0',
-            'cv_file'           => 'required|file|mimes:pdf,doc,docx|max:5120',
+            'cv_file'           => 'required|file|mimes:pdf,doc,docx|mimetypes:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document|max:5120',
             'uploader_comments' => 'nullable|string|max:1000',
         ];
     }

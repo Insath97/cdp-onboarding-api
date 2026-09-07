@@ -57,7 +57,7 @@ class CandidateController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = (int) $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $user = auth()->user();
             $query = Candidate::with(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name'])
                               ->accessibleBy($user);

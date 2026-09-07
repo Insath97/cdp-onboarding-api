@@ -29,7 +29,7 @@ class ActivityLogController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = (int) $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = ActivityLog::with('user:id,name,email');
 
             // Keyword search filter (description, module, action, ip_address)

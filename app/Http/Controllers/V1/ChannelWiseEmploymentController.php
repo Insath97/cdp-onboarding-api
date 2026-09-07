@@ -35,7 +35,7 @@ class ChannelWiseEmploymentController extends Controller implements HasMiddlewar
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
+            $perPage = min((int) $request->get('per_page', 15), 100);
             $query = ChannelWiseEmployment::query();
 
             // Apply Search Scope if search parameter is present
@@ -167,6 +167,14 @@ class ChannelWiseEmploymentController extends Controller implements HasMiddlewar
             }
 
             $employmentName = $employment->name;
+
+            if (!auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete channel wise employments'
+                ], 403);
+            }
+
             $employment->delete();
 
             $this->logActivity('DELETE', 'ChannelWiseEmployment', "Deleted channel wise employment: {$employmentName}");

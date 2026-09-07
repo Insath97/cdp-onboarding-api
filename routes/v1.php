@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Route;
 /* public routes */
 
 Route::prefix('v1')->group(function () {
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 });
 
 /* protected routes */

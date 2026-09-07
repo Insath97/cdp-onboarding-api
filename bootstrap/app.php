@@ -11,6 +11,8 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ForceHttps;
+use Illuminate\Http\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,8 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->api(append: [
+            ForceHttps::class,
             SanitizeInput::class,
             SecurityHeaders::class,
+            ThrottleRequests::class.':60,1',
         ]);
 
         $middleware->alias([
