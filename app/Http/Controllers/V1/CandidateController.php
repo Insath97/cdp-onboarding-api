@@ -11,6 +11,8 @@ use App\Http\Requests\Reject1stInterviewRequest;
 use App\Http\Requests\Assign2ndInterviewRequest;
 use App\Http\Requests\Approve2ndInterviewRequest;
 use App\Http\Requests\Reject2ndInterviewRequest;
+use App\Http\Requests\ApproveFinalRequest;
+use App\Http\Requests\RejectFinalRequest;
 use App\Models\Candidate;
 use App\Models\ChannelHeadHistory;
 use App\Models\InterviewApproval;
@@ -40,6 +42,8 @@ class CandidateController extends Controller implements HasMiddleware
             new Middleware('permission:Candidate Assign 2nd Interview', ['only' => ['assign2ndInterview']]),
             new Middleware('permission:Candidate Approve 2nd Interview', ['only' => ['approve2ndInterview']]),
             new Middleware('permission:Candidate Reject 2nd Interview', ['only' => ['reject2ndInterview']]),
+            new Middleware('permission:Candidate Approve Final', ['only' => ['approveFinal']]),
+            new Middleware('permission:Candidate Reject Final', ['only' => ['rejectFinal']]),
         ];
     }
 
@@ -788,6 +792,149 @@ class CandidateController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to reject 2nd interview',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Final approval sign-off (candidate officially hired/onboarded).
+     */
+    public function approveFinal(ApproveFinalRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('APPROVE_FINAL_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
+            if ($candidate->status !== '2nd_interview_passed') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate final approval requires '2nd_interview_passed' status. Current status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => 'final_approval',
+                'action'         => 'approved',
+                'interview_date' => $data['approval_date'],
+                'comments'       => $data['comments'],
+                'status'         => 'completed',
+            ]);
+
+            $candidate->status = 'final_approved';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'APPROVE_FINAL',
+                'Candidate',
+                "Final approval granted for candidate: {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'approval_date' => $data['approval_date']]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate final approval completed successfully. Candidate officially onboarded!',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to perform final approval',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Final rejection (candidate application closed).
+     */
+    public function rejectFinal(RejectFinalRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('REJECT_FINAL_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
+            if (in_array($candidate->status, ['final_approved', 'rejected'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate cannot be rejected from final closed status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => 'final_approval',
+                'action'         => 'rejected',
+                'interview_date' => $data['rejection_date'],
+                'comments'       => $data['comments'],
+                'status'         => 'rejected',
+            ]);
+
+            $candidate->status = 'rejected';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'REJECT_FINAL',
+                'Candidate',
+                "Final rejection issued for candidate: {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'rejection_date' => $data['rejection_date']],
+                'warning'
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate final rejection completed successfully',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reject candidate',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }

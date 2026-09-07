@@ -109,7 +109,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     // Activity Logs
     Route::apiResource('activity-logs', ActivityLogController::class)->only(['index', 'show']);
 
-    // Candidates & Interview Workflow (Stage 0, 1, 2)
+    // Candidates & Interview Workflow (Stage 0, 1, 2, 3)
     Route::prefix('candidates')->group(function () {
         Route::get('list',                       [CandidateController::class, 'getCandidateList']);
         Route::get('{id}/approvals',             [CandidateController::class, 'getApprovals']);
@@ -121,6 +121,9 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::post('{id}/assign-2nd-interview', [CandidateController::class, 'assign2ndInterview']);
         Route::post('{id}/approve-2nd-interview',[CandidateController::class, 'approve2ndInterview']);
         Route::post('{id}/reject-2nd-interview', [CandidateController::class, 'reject2ndInterview']);
+        // Stage 3 (Final Approval)
+        Route::post('{id}/approve-final',        [CandidateController::class, 'approveFinal']);
+        Route::post('{id}/reject-final',         [CandidateController::class, 'rejectFinal']);
     });
     Route::apiResource('candidates', CandidateController::class);
 });
