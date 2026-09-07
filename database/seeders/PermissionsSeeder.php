@@ -114,6 +114,9 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Candidate Approve Final', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Reject Final', 'group_name' => 'Candidate Management Permissions'],
 
+            /* Employee Hierarchy Management */
+            ['name' => 'Employee Hierarchy View', 'group_name' => 'Employee Hierarchy Management Permissions'],
+            ['name' => 'Employee Hierarchy Reassign', 'group_name' => 'Employee Hierarchy Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {

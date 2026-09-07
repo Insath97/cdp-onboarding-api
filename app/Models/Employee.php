@@ -219,6 +219,40 @@ class Employee extends Model
     }
 
     /**
+     * Get the historical reporting manager changes for this employee.
+     */
+    public function hierarchyHistories(): HasMany
+    {
+        return $this->hasMany(EmployeeHierarchyHistory::class, 'employee_id');
+    }
+
+    /**
+     * Resolve reporting manager as of a specific date.
+     */
+    public function resolveReportingManagerAsOf(string $date): ?Employee
+    {
+        $history = EmployeeHierarchyHistory::where('employee_id', $this->id)
+            ->asOf($date)
+            ->with('reportingManager')
+            ->first();
+
+        return $history ? $history->reportingManager : null;
+    }
+
+    /**
+     * Resolve direct subordinates as of a specific date.
+     */
+    public function resolveSubordinatesAsOf(string $date)
+    {
+        $histories = EmployeeHierarchyHistory::where('reporting_manager_id', $this->id)
+            ->asOf($date)
+            ->with('employee')
+            ->get();
+
+        return $histories->map(fn ($h) => $h->employee)->filter();
+    }
+
+    /**
      * Get all user IDs associated with subordinate employees (recursive).
      */
     public function getAllDescendantUserIds(): array

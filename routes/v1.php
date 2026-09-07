@@ -16,6 +16,7 @@ use App\Http\Controllers\V1\ChannelWiseEmploymentController;
 use App\Http\Controllers\V1\ChannelHeadController;
 use App\Http\Controllers\V1\ActivityLogController;
 use App\Http\Controllers\V1\CandidateController;
+use App\Http\Controllers\V1\EmployeeHierarchyController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -105,6 +106,13 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('{id}/head/history',   [ChannelHeadController::class, 'getHistory']);
     });
     Route::apiResource('channel-wise-employments', ChannelWiseEmploymentController::class);
+
+    // Employee Hierarchy
+    Route::prefix('employees')->group(function () {
+        Route::get('{id}/manager-history',  [EmployeeHierarchyController::class, 'getHistory']);
+        Route::post('{id}/reassign-manager', [EmployeeHierarchyController::class, 'reassignManager']);
+        Route::get('{id}/hierarchy-as-of',  [EmployeeHierarchyController::class, 'getHierarchyAsOf']);
+    });
 
     // Activity Logs
     Route::apiResource('activity-logs', ActivityLogController::class)->only(['index', 'show']);
