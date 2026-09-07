@@ -8,6 +8,9 @@ use App\Http\Requests\UpdateCandidateRequest;
 use App\Http\Requests\Assign1stInterviewRequest;
 use App\Http\Requests\Approve1stInterviewRequest;
 use App\Http\Requests\Reject1stInterviewRequest;
+use App\Http\Requests\Assign2ndInterviewRequest;
+use App\Http\Requests\Approve2ndInterviewRequest;
+use App\Http\Requests\Reject2ndInterviewRequest;
 use App\Models\Candidate;
 use App\Models\ChannelHeadHistory;
 use App\Models\InterviewApproval;
@@ -34,6 +37,9 @@ class CandidateController extends Controller implements HasMiddleware
             new Middleware('permission:Candidate Assign 1st Interview', ['only' => ['assign1stInterview']]),
             new Middleware('permission:Candidate Approve 1st Interview', ['only' => ['approve1stInterview']]),
             new Middleware('permission:Candidate Reject 1st Interview', ['only' => ['reject1stInterview']]),
+            new Middleware('permission:Candidate Assign 2nd Interview', ['only' => ['assign2ndInterview']]),
+            new Middleware('permission:Candidate Approve 2nd Interview', ['only' => ['approve2ndInterview']]),
+            new Middleware('permission:Candidate Reject 2nd Interview', ['only' => ['reject2ndInterview']]),
         ];
     }
 
@@ -567,6 +573,221 @@ class CandidateController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve approval history',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Assign/delegate the 2nd interview to another user.
+     */
+    public function assign2ndInterview(Assign2ndInterviewRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('ASSIGN_2ND_INTERVIEW_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
+            if (! in_array($candidate->status, ['1st_interview_passed', '2nd_interview'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate 2nd interview cannot be assigned at current status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+
+            InterviewApproval::create([
+                'candidate_id'        => $candidate->id,
+                'actor_id'            => $user->id,
+                'assigned_to_user_id' => $data['assigned_to_user_id'],
+                'stage'               => '2nd_interview',
+                'action'              => 'assigned',
+                'assigned_date'       => $data['assigned_date'],
+                'comments'            => $data['comments'],
+                'status'              => 'pending',
+            ]);
+
+            $candidate->status = '2nd_interview';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.assignedToUser:id,name,email']);
+
+            $this->logActivity(
+                'ASSIGN_2ND_INTERVIEW',
+                'Candidate',
+                "Assigned 2nd interview for candidate {$candidate->full_name} to user ID {$data['assigned_to_user_id']}",
+                ['candidate_id' => $candidate->id, 'assigned_to_user_id' => $data['assigned_to_user_id']]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => '2nd interview assigned successfully',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to assign 2nd interview',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve 2nd interview (candidate passes to Stage 3 Final Approval).
+     */
+    public function approve2ndInterview(Approve2ndInterviewRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('APPROVE_2ND_INTERVIEW_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
+            if (! in_array($candidate->status, ['1st_interview_passed', '2nd_interview'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "2nd interview cannot be approved for candidate with status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => '2nd_interview',
+                'action'         => 'approved',
+                'interview_date' => $data['interview_date'],
+                'comments'       => $data['comments'],
+                'status'         => 'completed',
+            ]);
+
+            $candidate->status = '2nd_interview_passed';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'APPROVE_2ND_INTERVIEW',
+                'Candidate',
+                "Approved 2nd interview for candidate: {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'interview_date' => $data['interview_date']]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => '2nd interview approved successfully. Candidate passed to Stage 3 Final Approval.',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to approve 2nd interview',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Reject 2nd interview (candidate fails 2nd interview).
+     */
+    public function reject2ndInterview(Reject2ndInterviewRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('REJECT_2ND_INTERVIEW_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record outside your channel or hierarchy',
+                ], 403);
+            }
+
+            if (in_array($candidate->status, ['2nd_interview_passed', '2nd_interview_rejected', 'final_approved', 'rejected'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate cannot be rejected from status: {$candidate->status}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => '2nd_interview',
+                'action'         => 'rejected',
+                'interview_date' => $data['interview_date'],
+                'comments'       => $data['comments'],
+                'status'         => 'rejected',
+            ]);
+
+            $candidate->status = '2nd_interview_rejected';
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'REJECT_2ND_INTERVIEW',
+                'Candidate',
+                "Rejected 2nd interview for candidate: {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'interview_date' => $data['interview_date']],
+                'warning'
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => '2nd interview rejected successfully',
+                'data' => $candidate,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reject 2nd interview',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }
