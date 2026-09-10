@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 // Root endpoint
 Route::get('/', function () {
     return response()->json([
-        'message' => 'CDP Connect web application API',
+        'message' => 'VECTOR Onboarding Application API',
         'version' => '1.0.0',
         'health' => '/health-check',
         'baseUrl' => env('APP_URL', 'http://localhost'),
@@ -20,7 +20,7 @@ Route::get('/health', function () {
         'status' => 'healthy',
         'date' => $currentDateTime->toDateString(),
         'time' => $currentDateTime->toTimeString(),
-        'service' => 'CDP Web Application System API',
+        'service' => 'VECTOR Onboarding Application API',
         'components' => []
     ];
 

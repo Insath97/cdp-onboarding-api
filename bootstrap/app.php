@@ -12,7 +12,7 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\ForceHttps;
-use Illuminate\Http\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
