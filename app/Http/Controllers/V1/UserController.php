@@ -115,10 +115,23 @@ class UserController extends Controller implements HasMiddleware
 
             // Create Employee first if user_type is staff
             if ($data['user_type'] === 'staff') {
+                $nameParts = explode(' ', $data['name']);
+                $fName = $nameParts[0];
+                $lName = count($nameParts) > 1 ? end($nameParts) : $fName;
+
                 $employeeData = [
+                    'f_name' => $request->input('f_name', $fName),
+                    'l_name' => $request->input('l_name', $lName),
+                    'full_name' => $request->input('full_name', $data['name']),
+                    'name_with_initials' => $request->input('name_with_initials', $data['name']),
                     'employee_code' => $data['employee_code'],
+                    'employee_type' => $request->input('employee_type', 'permanent'),
+                    'id_type' => $request->input('id_type', 'nic'),
                     'id_number' => $data['id_number'],
+                    'date_of_birth' => $request->input('date_of_birth', '2000-01-01'),
+                    'email' => $data['email'] ?? ($data['id_number'] . '@example.com'),
                     'phone' => $data['phone'] ?? null,
+                    'phone_primary' => $data['phone'] ?? '0000000000',
                     'branch_id' => $data['branch_id'] ?? null,
                     'zonal_id' => $data['zonal_id'] ?? null,
                     'region_id' => $data['region_id'] ?? null,
@@ -297,7 +310,7 @@ class UserController extends Controller implements HasMiddleware
             $targetUserType = $data['user_type'] ?? $user->user_type;
 
             if ($targetUserType === 'staff') {
-                $employeeData = array_intersect_key($data, array_flip([
+                $employeeDataFields = [
                     'employee_code',
                     'id_number',
                     'phone',
@@ -307,13 +320,39 @@ class UserController extends Controller implements HasMiddleware
                     'province_id',
                     'designation_id',
                     'reporting_manager_id'
-                ]));
+                ];
+
+                $employeeData = array_intersect_key($data, array_flip($employeeDataFields));
+
+                if (isset($data['name'])) {
+                    $nameParts = explode(' ', $data['name']);
+                    $employeeData['f_name'] = $request->input('f_name', $nameParts[0]);
+                    $employeeData['l_name'] = $request->input('l_name', count($nameParts) > 1 ? end($nameParts) : $nameParts[0]);
+                    $employeeData['full_name'] = $request->input('full_name', $data['name']);
+                    $employeeData['name_with_initials'] = $request->input('name_with_initials', $data['name']);
+                }
+                
+                if (isset($data['phone'])) {
+                    $employeeData['phone_primary'] = $data['phone'];
+                }
 
                 if ($user->employee) {
                     // Update existing employee
                     $user->employee->update($employeeData);
                 } else {
                     // Create new employee if they were previously an admin
+                    $employeeData['employee_type'] = $request->input('employee_type', 'permanent');
+                    $employeeData['id_type'] = $request->input('id_type', 'nic');
+                    $employeeData['date_of_birth'] = $request->input('date_of_birth', '2000-01-01');
+                    if (!isset($employeeData['phone_primary'])) {
+                        $employeeData['phone_primary'] = '0000000000';
+                    }
+                    if (isset($data['email'])) {
+                         $employeeData['email'] = $data['email'];
+                    } else {
+                         $employeeData['email'] = ($data['id_number'] ?? $user->username) . '@example.com';
+                    }
+
                     $employee = Employee::create($employeeData);
                     $data['employee_id'] = $employee->id;
                 }
