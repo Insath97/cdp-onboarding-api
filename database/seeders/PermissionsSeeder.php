@@ -124,6 +124,10 @@ class PermissionsSeeder extends Seeder
 
             /* Database Management */
             ['name' => 'Database Export', 'group_name' => 'Database Management Permissions'],
+
+            /* Import Management */
+            ['name' => 'Import Index', 'group_name' => 'Import Management Permissions'],
+            ['name' => 'Bulk Import', 'group_name' => 'Import Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {

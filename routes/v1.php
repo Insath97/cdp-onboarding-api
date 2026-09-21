@@ -19,6 +19,7 @@ use App\Http\Controllers\V1\CandidateController;
 use App\Http\Controllers\V1\EmployeeHierarchyController;
 use App\Http\Controllers\V1\NotificationController;
 use App\Http\Controllers\V1\DatabaseController;
+use App\Http\Controllers\V1\ImportController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -152,5 +153,13 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('export-data',          [DatabaseController::class, 'exportData']);
         Route::get('export-table/{table}', [DatabaseController::class, 'exportTable']);
         Route::get('export-all-tables',    [DatabaseController::class, 'exportAllTables']);
+    });
+
+    // Bulk Import
+    Route::prefix('import')->group(function () {
+        Route::get('tables',           [ImportController::class, 'listTables']);
+        Route::get('catalog',          [ImportController::class, 'index']);
+        Route::get('template/{table}', [ImportController::class, 'downloadTemplate']);
+        Route::post('{table}',         [ImportController::class, 'import']);
     });
 });
