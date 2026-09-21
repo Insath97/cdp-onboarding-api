@@ -121,6 +121,9 @@ class PermissionsSeeder extends Seeder
             /* System Notifications Management */
             ['name' => 'Notification Index', 'group_name' => 'System Notifications Management Permissions'],
             ['name' => 'Notification Mark Read', 'group_name' => 'System Notifications Management Permissions'],
+
+            /* Database Management */
+            ['name' => 'Database Export', 'group_name' => 'Database Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
