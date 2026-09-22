@@ -147,7 +147,7 @@ class UserController extends Controller implements HasMiddleware
 
                 $data['employee_id'] = $employee->id;
                 $data['username'] = $data['id_number'];
-                $data['password'] = Hash::make($generatedPassword);
+                $data['password'] = Hash::make($data['id_number']);
             } else {
                 // For admin users
                 $data['employee_id'] = null;
@@ -178,7 +178,7 @@ class UserController extends Controller implements HasMiddleware
                         'user_type' => $user->user_type,
                         'email_verified_at' => $user->email_verified_at,
                     ],
-                    'password' => ($user->user_type === 'staff') ? $generatedPassword : $request->password,
+                    'password' => ($user->user_type === 'staff') ? $data['id_number'] : $request->password,
                     'role' => $data['role'] ?? null,
                     'created_by' => $currentUser ? $currentUser->name : 'System',
                     'login_url' => trim(config('app.frontend_url') ?? config('app.url')),
@@ -387,7 +387,6 @@ class UserController extends Controller implements HasMiddleware
                 'employee.province',
                 'employee.reportingManager.user',
                 'employee.designation',
-                'employee.channelWiseEmployment',
                 'roles',
                 'permissions',
             ]);
