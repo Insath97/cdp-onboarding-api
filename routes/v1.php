@@ -18,6 +18,9 @@ use App\Http\Controllers\V1\ActivityLogController;
 use App\Http\Controllers\V1\CandidateController;
 use App\Http\Controllers\V1\EmployeeHierarchyController;
 use App\Http\Controllers\V1\NotificationController;
+use App\Http\Controllers\V1\DatabaseController;
+use App\Http\Controllers\V1\ImportController;
+use App\Http\Controllers\V1\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -31,6 +34,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('me', [AuthController::class, 'me']);
+    Route::get('dashboard', [DashboardController::class, 'index']);
 
     Route::get('permissions/list', [PermissionController::class, 'getPermissionList']);
     Route::apiResource('permissions', PermissionController::class);
@@ -144,4 +148,20 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::post('{id}/reject-final',         [CandidateController::class, 'rejectFinal']);
     });
     Route::apiResource('candidates', CandidateController::class);
+
+    // Database & Data Export
+    Route::prefix('database')->group(function () {
+        Route::get('export',               [DatabaseController::class, 'export']);
+        Route::get('export-data',          [DatabaseController::class, 'exportData']);
+        Route::get('export-table/{table}', [DatabaseController::class, 'exportTable']);
+        Route::get('export-all-tables',    [DatabaseController::class, 'exportAllTables']);
+    });
+
+    // Bulk Import
+    Route::prefix('import')->group(function () {
+        Route::get('tables',           [ImportController::class, 'listTables']);
+        Route::get('catalog',          [ImportController::class, 'index']);
+        Route::get('template/{table}', [ImportController::class, 'downloadTemplate']);
+        Route::post('{table}',         [ImportController::class, 'import']);
+    });
 });

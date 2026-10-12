@@ -3,14 +3,9 @@
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-// Root endpoint
+// Landing page
 Route::get('/', function () {
-    return response()->json([
-        'message' => 'CDP Connect web application API',
-        'version' => '1.0.0',
-        'health' => '/health-check',
-        'baseUrl' => env('APP_URL', 'http://localhost'),
-    ]);
+    return view('landing');
 });
 
 // Comprehensive health check
@@ -20,7 +15,7 @@ Route::get('/health', function () {
         'status' => 'healthy',
         'date' => $currentDateTime->toDateString(),
         'time' => $currentDateTime->toTimeString(),
-        'service' => 'CDP Web Application System API',
+        'service' => 'VECTOR Onboarding Application API',
         'components' => []
     ];
 
