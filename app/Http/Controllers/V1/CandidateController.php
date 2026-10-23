@@ -802,11 +802,20 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['1st_interview_passed', '2nd_interview'])) {
+            if ($candidate->status !== '2nd_interview') {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "2nd interview cannot be approved for candidate with status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview must be assigned before approval. Current status: {$candidate->status}",
                 ], 422);
+            }
+
+            if (! $user->hasRole('Super Admin') && ! $candidate->isAssigned2ndInterviewer($user)) {
+                $this->logActivity('APPROVE_2ND_INTERVIEW_UNAUTHORIZED', 'Candidate', "Unauthorized 2nd interview approval attempt on candidate ID: {$id} by user ID: {$user->id}", ['candidate_id' => $candidate->id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only the assigned interviewer or Super Admin can approve this 2nd interview.',
+                ], 403);
             }
 
             $data = $request->validated();
@@ -879,11 +888,20 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (in_array($candidate->status, ['2nd_interview_passed', '2nd_interview_rejected', 'final_approved', 'rejected'])) {
+            if ($candidate->status !== '2nd_interview') {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be rejected from status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview must be assigned before rejection. Current status: {$candidate->status}",
                 ], 422);
+            }
+
+            if (! $user->hasRole('Super Admin') && ! $candidate->isAssigned2ndInterviewer($user)) {
+                $this->logActivity('REJECT_2ND_INTERVIEW_UNAUTHORIZED', 'Candidate', "Unauthorized 2nd interview rejection attempt on candidate ID: {$id} by user ID: {$user->id}", ['candidate_id' => $candidate->id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only the assigned interviewer or Super Admin can reject this 2nd interview.',
+                ], 403);
             }
 
             $data = $request->validated();

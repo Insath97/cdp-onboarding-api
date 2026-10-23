@@ -102,6 +102,28 @@ class Candidate extends Model
     }
 
     /**
+     * Get the latest 2nd interview assignment approval record.
+     */
+    public function latest2ndInterviewAssignment(): ?InterviewApproval
+    {
+        return $this->approvals()
+            ->where('stage', '2nd_interview')
+            ->where('action', 'assigned')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Check if the given user is the actively assigned interviewer for 2nd interview.
+     */
+    public function isAssigned2ndInterviewer(User $user): bool
+    {
+        $assignment = $this->latest2ndInterviewAssignment();
+
+        return $assignment && (int) $assignment->assigned_to_user_id === (int) $user->id;
+    }
+
+    /**
      * Scope a query to search across first_name, last_name, nic_number, and phone_number.
      */
     public function scopeSearch($query, string $search)
@@ -162,11 +184,9 @@ class Candidate extends Model
         $descendantUserIds = $user->getAllDescendantIds();
         $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
 
-        // Check if user has 2nd interview or final approval cross-channel permissions
+        // Only users with 'Candidate Assign 2nd Interview' can view the full 2nd interview pool across channels
         $canAccess2ndInterview = $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
-            'Candidate Approve 2nd Interview',
-            'Candidate Reject 2nd Interview',
         ]);
 
         $canAccessFinalApproval = $user->hasAnyPermission([
@@ -262,8 +282,6 @@ class Candidate extends Model
         ];
         if (in_array($this->status, $secondInterviewStatuses) && $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
-            'Candidate Approve 2nd Interview',
-            'Candidate Reject 2nd Interview',
         ])) {
             return true;
         }
