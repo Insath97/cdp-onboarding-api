@@ -21,11 +21,11 @@ class ZonalController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Zonal Index', ['only' => ['index', 'show']]),
-            new Middleware('permission:Zonal Create', ['only' => ['store']]),
-            new Middleware('permission:Zonal Update', ['only' => ['update']]),
-            new Middleware('permission:Zonal Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Zonal Toggle Status', ['only' => ['toggleStatus']]),
+            new Middleware('permission:Zonal Index', ['index', 'show']),
+            new Middleware('permission:Zonal Create', ['store']),
+            new Middleware('permission:Zonal Update', ['update']),
+            new Middleware('permission:Zonal Delete', ['destroy']),
+            new Middleware('permission:Zonal Toggle Status', ['toggleStatus']),
         ];
     }
 

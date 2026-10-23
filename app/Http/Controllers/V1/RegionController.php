@@ -21,11 +21,11 @@ class RegionController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Region Index', ['only' => ['index', 'show']]),
-            new Middleware('permission:Region Create', ['only' => ['store']]),
-            new Middleware('permission:Region Update', ['only' => ['update']]),
-            new Middleware('permission:Region Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Region Toggle Status', ['only' => ['toggleStatus']]),
+            new Middleware('permission:Region Index', ['index', 'show']),
+            new Middleware('permission:Region Create', ['store']),
+            new Middleware('permission:Region Update', ['update']),
+            new Middleware('permission:Region Delete', ['destroy']),
+            new Middleware('permission:Region Toggle Status', ['toggleStatus']),
         ];
     }
 

@@ -191,7 +191,9 @@ class Candidate extends Model
         ]);
 
         // View-only users for the 2nd interview list (no action rights)
-        $canView2ndList = $user->hasPermissionTo('Candidate 2nd Interview List');
+        $canView2ndList = $user->hasAnyPermission([
+            'Candidate 2nd Interview List',
+        ]);
 
         $canAccessFinalApproval = $user->hasAnyPermission([
             'Candidate Approve Final',
@@ -309,7 +311,9 @@ class Candidate extends Model
             '2nd_interview',
             '2nd_interview_rejected',
         ];
-        if (in_array($this->status, $secondInterviewStageStatuses) && $user->hasPermissionTo('Candidate 2nd Interview List')) {
+        if (in_array($this->status, $secondInterviewStageStatuses) && $user->hasAnyPermission([
+            'Candidate 2nd Interview List',
+        ])) {
             return true;
         }
 

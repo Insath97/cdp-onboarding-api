@@ -36,19 +36,19 @@ class CandidateController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List|Candidate Assigned List', ['only' => ['index', 'getCandidateList']]),
-            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['only' => ['show', 'getApprovals', 'getInterviewers']]),
-            new Middleware('permission:Candidate Create', ['only' => ['store']]),
-            new Middleware('permission:Candidate Update', ['only' => ['update']]),
-            new Middleware('permission:Candidate Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Candidate Assign 1st Interview', ['only' => ['assign1stInterview']]),
-            new Middleware('permission:Candidate Approve 1st Interview', ['only' => ['approve1stInterview']]),
-            new Middleware('permission:Candidate Reject 1st Interview', ['only' => ['reject1stInterview']]),
-            new Middleware('permission:Candidate Assign 2nd Interview', ['only' => ['assign2ndInterview']]),
-            new Middleware('permission:Candidate Approve 2nd Interview', ['only' => ['approve2ndInterview']]),
-            new Middleware('permission:Candidate Reject 2nd Interview', ['only' => ['reject2ndInterview']]),
-            new Middleware('permission:Candidate Approve Final', ['only' => ['approveFinal']]),
-            new Middleware('permission:Candidate Reject Final', ['only' => ['rejectFinal']]),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List|Candidate Assigned List', ['index', 'getCandidateList']),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['show', 'getApprovals', 'getInterviewers']),
+            new Middleware('permission:Candidate Create', ['store']),
+            new Middleware('permission:Candidate Update', ['update']),
+            new Middleware('permission:Candidate Delete', ['destroy']),
+            new Middleware('permission:Candidate Assign 1st Interview', ['assign1stInterview']),
+            new Middleware('permission:Candidate Approve 1st Interview', ['approve1stInterview']),
+            new Middleware('permission:Candidate Reject 1st Interview', ['reject1stInterview']),
+            new Middleware('permission:Candidate Assign 2nd Interview', ['assign2ndInterview']),
+            new Middleware('permission:Candidate Approve 2nd Interview', ['approve2ndInterview']),
+            new Middleware('permission:Candidate Reject 2nd Interview', ['reject2ndInterview']),
+            new Middleware('permission:Candidate Approve Final', ['approveFinal']),
+            new Middleware('permission:Candidate Reject Final', ['rejectFinal']),
         ];
     }
 

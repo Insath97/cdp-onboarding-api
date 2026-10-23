@@ -147,5 +147,7 @@ class PermissionsSeeder extends Seeder
 
         $allPermissions = Permission::all();
         $role->syncPermissions($allPermissions);
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
