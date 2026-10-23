@@ -106,7 +106,7 @@ class Candidate extends Model
      */
     public function latest2ndInterviewAssignment(): ?InterviewApproval
     {
-        return $this->approvals()
+        return InterviewApproval::where('candidate_id', $this->id)
             ->where('stage', '2nd_interview')
             ->where('action', 'assigned')
             ->latest('id')
@@ -184,9 +184,11 @@ class Candidate extends Model
         $descendantUserIds = $user->getAllDescendantIds();
         $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
 
-        // Only users with 'Candidate Assign 2nd Interview' can view the full 2nd interview pool across channels
+        // Users holding any 2nd interview permission can view the 2nd interview pool across channels
         $canAccess2ndInterview = $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
+            'Candidate Approve 2nd Interview',
+            'Candidate Reject 2nd Interview',
         ]);
 
         $canAccessFinalApproval = $user->hasAnyPermission([
@@ -282,6 +284,8 @@ class Candidate extends Model
         ];
         if (in_array($this->status, $secondInterviewStatuses) && $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
+            'Candidate Approve 2nd Interview',
+            'Candidate Reject 2nd Interview',
         ])) {
             return true;
         }

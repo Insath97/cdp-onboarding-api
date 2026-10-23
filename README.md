@@ -183,7 +183,7 @@ stateDiagram-v2
 1. They (or a descendant in their reporting manager hierarchy) uploaded the candidate
 2. They are the channel head for the candidate's channel
 3. They were assigned the candidate in an interview approval record
-4. **Cross-channel 2nd Interview Access:** Users holding `Candidate Assign 2nd Interview` can view candidates in the 2nd interview pool (`1st_interview_passed`, `2nd_interview`, etc.) across all channels to assign interviewers. Once assigned, **only the assigned interviewer** (or Super Admin) can view, approve, or reject that candidate's 2nd interview.
+4. **Cross-channel 2nd Interview Access:** Users holding 2nd interview permissions (`Candidate Assign 2nd Interview`, `Candidate Approve 2nd Interview`, `Candidate Reject 2nd Interview`) can view candidates in the 2nd interview pool (`1st_interview_passed`, `2nd_interview`, etc.) across all channels. However, **only the assigned interviewer** (or Super Admin) can approve or reject that candidate's 2nd interview.
 5. **Cross-channel Final Approval Access:** Once a candidate completes 2nd interview (`2nd_interview_passed`, etc.), users holding Final Approval permissions (`Candidate Approve Final`, `Candidate Reject Final`) can view and action the candidate across all channels
 
 ### RBAC Model
