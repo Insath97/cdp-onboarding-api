@@ -134,6 +134,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     // Candidates & Interview Workflow (Stage 0, 1, 2, 3)
     Route::prefix('candidates')->group(function () {
         Route::get('list',                       [CandidateController::class, 'getCandidateList']);
+        Route::get('interviewers',              [CandidateController::class, 'getInterviewers']);
         Route::get('{id}/approvals',             [CandidateController::class, 'getApprovals']);
         // Stage 1
         Route::post('{id}/assign-1st-interview', [CandidateController::class, 'assign1stInterview']);

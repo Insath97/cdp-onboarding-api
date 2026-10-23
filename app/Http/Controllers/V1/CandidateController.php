@@ -36,7 +36,7 @@ class CandidateController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Candidate Index', ['only' => ['index', 'show', 'getCandidateList', 'getApprovals']]),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['only' => ['index', 'show', 'getCandidateList', 'getApprovals', 'getInterviewers']]),
             new Middleware('permission:Candidate Create', ['only' => ['store']]),
             new Middleware('permission:Candidate Update', ['only' => ['update']]),
             new Middleware('permission:Candidate Delete', ['only' => ['destroy']]),
@@ -52,7 +52,7 @@ class CandidateController extends Controller implements HasMiddleware
     }
 
     /**
-     * Display a listing of candidates with search, filtering, and channel visibility scoping.
+     * Display a listing of candidates with search, filtering, and channel/stage visibility scoping.
      */
     public function index(Request $request)
     {
@@ -67,9 +67,14 @@ class CandidateController extends Controller implements HasMiddleware
                 $query->search($request->search);
             }
 
-            // Status filter
+            // Status filter (supports single status or comma-separated list e.g. 1st_interview_passed,2nd_interview)
             if ($request->filled('status')) {
                 $query->status($request->status);
+            }
+
+            // Workflow stage filter (1st_interview, 2nd_interview, final_approval)
+            if ($request->filled('stage')) {
+                $query->stage($request->stage);
             }
 
             // Designation filter
@@ -83,7 +88,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'GET_ALL',
                 'Candidate',
                 'Retrieved candidate listing',
-                $request->only(['search', 'status', 'designation_id', 'per_page', 'page'])
+                $request->only(['search', 'status', 'stage', 'designation_id', 'per_page', 'page'])
             );
 
             return response()->json([
@@ -314,8 +319,18 @@ class CandidateController extends Controller implements HasMiddleware
             $user = auth()->user();
             $query = Candidate::accessibleBy($user);
 
+            // Status filter (single or comma-separated)
+            if ($request->filled('status')) {
+                $query->status($request->status);
+            }
+
+            // Workflow stage filter (1st_interview, 2nd_interview, final_approval)
+            if ($request->filled('stage')) {
+                $query->stage($request->stage);
+            }
+
             $candidates = $query->orderBy('first_name', 'asc')
-                                ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id']);
+                                ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id', 'status']);
 
             $this->logActivity('GET_LIST', 'Candidate', 'Retrieved candidate select box list');
 
@@ -329,6 +344,77 @@ class CandidateController extends Controller implements HasMiddleware
                 'status' => 'error',
                 'message' => 'Failed to retrieve candidate list',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get active users eligible for assignment as interviewers for a given workflow stage.
+     */
+    public function getInterviewers(Request $request)
+    {
+        try {
+            $stage = $request->get('stage', '2nd_interview');
+
+            $permission = match ($stage) {
+                '1st_interview'  => 'Candidate Approve 1st Interview',
+                '2nd_interview'  => 'Candidate Approve 2nd Interview',
+                'final_approval' => 'Candidate Approve Final',
+                default          => 'Candidate Approve 2nd Interview',
+            };
+
+            $query = User::where('is_active', true)
+                ->where(function ($q) use ($permission) {
+                    $q->permission($permission)
+                      ->orWhereHas('roles', function ($rq) {
+                          $rq->where('name', 'Super Admin');
+                      });
+                })
+                ->with([
+                    'employee:id,f_name,l_name,full_name,employee_code,designation_id,branch_id',
+                    'employee.designation:id,name',
+                    'employee.branch:id,name',
+                    'roles:id,name',
+                ]);
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('username', 'like', "%{$search}%")
+                      ->orWhereHas('employee', function ($eq) use ($search) {
+                          $eq->where('full_name', 'like', "%{$search}%")
+                             ->orWhere('employee_code', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            $users = $query->orderBy('name', 'asc')->get();
+
+            $data = $users->map(function ($u) {
+                return [
+                    'id'               => $u->id,
+                    'name'             => $u->name,
+                    'email'            => $u->email,
+                    'username'         => $u->username,
+                    'employee_id'      => $u->employee_id,
+                    'designation_name' => $u->employee?->designation?->name,
+                    'branch_name'      => $u->employee?->branch?->name,
+                    'roles'            => $u->roles->pluck('name'),
+                ];
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Interviewers retrieved successfully',
+                'data'    => $data,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to retrieve interviewers',
+                'error'   => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }
     }

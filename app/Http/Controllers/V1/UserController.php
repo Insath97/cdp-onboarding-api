@@ -60,6 +60,16 @@ class UserController extends Controller implements HasMiddleware
                 });
             }
 
+            if ($request->has('permission')) {
+                $permission = $request->permission;
+                $query->where(function ($q) use ($permission) {
+                    $q->permission($permission)
+                      ->orWhereHas('roles', function ($rq) {
+                          $rq->where('name', 'Super Admin');
+                      });
+                });
+            }
+
             if ($request->has('branch_id')) {
                 $query->whereHas('employee', function ($q) use ($request) {
                     $q->where('branch_id', $request->branch_id);

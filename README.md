@@ -179,10 +179,12 @@ stateDiagram-v2
     final_approval --> [*]
 ```
 
-**Access Control:** A non-Super-Admin user can only see candidates where:
-1. They (or a descendant) uploaded the candidate
+**Access Control:** A non-Super-Admin user can see candidates where:
+1. They (or a descendant in their reporting manager hierarchy) uploaded the candidate
 2. They are the channel head for the candidate's channel
 3. They were assigned the candidate in an interview approval record
+4. **Cross-channel 2nd Interview Access:** Once a candidate completes 1st interview (`1st_interview_passed`, `2nd_interview`, etc.), users holding 2nd interview permissions (`Candidate Assign 2nd Interview`, `Candidate Approve 2nd Interview`, `Candidate Reject 2nd Interview`) can view and action the candidate across all channels
+5. **Cross-channel Final Approval Access:** Once a candidate completes 2nd interview (`2nd_interview_passed`, etc.), users holding Final Approval permissions (`Candidate Approve Final`, `Candidate Reject Final`) can view and action the candidate across all channels
 
 ### RBAC Model
 
@@ -442,8 +444,9 @@ Authorization: Bearer <jwt_token>
 
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
-| `GET` | `/api/v1/candidates/list` | `Candidate Index` | Lightweight candidate list (access-scoped) |
-| `GET` | `/api/v1/candidates` | `Candidate Index` | Paginated candidates with search, status, designation filters (access-scoped) |
+| `GET` | `/api/v1/candidates/list` | `Candidate Index` | Lightweight candidate list (supports `status`, `stage` filters) |
+| `GET` | `/api/v1/candidates/interviewers` | `Candidate Index` / Interview permission | List eligible active interviewers (`?stage=1st_interview\|2nd_interview\|final_approval`) |
+| `GET` | `/api/v1/candidates` | `Candidate Index` | Paginated candidates with search, `status`, `stage`, designation filters (access-scoped) |
 | `POST` | `/api/v1/candidates` | `Candidate Create` | Submit candidate CV (file upload, channel head snapshot) |
 | `GET` | `/api/v1/candidates/{id}` | `Candidate Index` | Get candidate details (access-checked) |
 | `PUT/PATCH` | `/api/v1/candidates/{id}` | `Candidate Update` | Update candidate profile, optionally replace CV |

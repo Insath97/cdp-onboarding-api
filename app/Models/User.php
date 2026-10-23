@@ -282,7 +282,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
             return $this->employee->getAllDescendantUserIds();
         }
 
-        return $this->load('employee')->employee->getAllDescendantUserIds();
+        return $this->load('employee')->employee?->getAllDescendantUserIds() ?? [];
     }
 
     /**

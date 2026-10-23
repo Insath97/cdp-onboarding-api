@@ -116,14 +116,41 @@ class Candidate extends Model
 
     /**
      * Scope a query to filter by candidate status.
+     * Supports single status, array of statuses, or comma-separated string (e.g., '1st_interview_passed,2nd_interview').
      */
-    public function scopeStatus($query, string $status)
+    public function scopeStatus($query, $status)
     {
+        if (is_array($status)) {
+            return $query->whereIn('status', $status);
+        }
+
+        if (is_string($status) && str_contains($status, ',')) {
+            $statuses = array_filter(array_map('trim', explode(',', $status)));
+            return $query->whereIn('status', $statuses);
+        }
+
         return $query->where('status', $status);
     }
 
     /**
-     * Scope query to only include candidates accessible by the given user based on channel & reporting manager hierarchy.
+     * Scope a query to filter by workflow stage.
+     */
+    public function scopeStage($query, string $stage)
+    {
+        return match ($stage) {
+            '1st_interview'  => $query->whereIn('status', ['pending', '1st_interview', '1st_interview_rejected']),
+            '2nd_interview'  => $query->whereIn('status', ['1st_interview_passed', '2nd_interview', '2nd_interview_rejected']),
+            'final_approval' => $query->whereIn('status', ['2nd_interview_passed', 'final_approved', 'rejected']),
+            default          => $query,
+        };
+    }
+
+    /**
+     * Scope query to only include candidates accessible by the given user:
+     * - Super Admins see all candidates across the organization.
+     * - Users with 2nd interview permissions see candidates who passed 1st interview (cross-channel).
+     * - Users with Final Approval permissions see candidates who passed 2nd interview (cross-channel).
+     * - Otherwise scoped to uploader hierarchy, Channel Head snapshot, or direct interview assignments.
      */
     public function scopeAccessibleBy($query, User $user)
     {
@@ -135,7 +162,42 @@ class Candidate extends Model
         $descendantUserIds = $user->getAllDescendantIds();
         $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
 
-        return $query->where(function ($q) use ($user, $employeeId, $allowedUserIds) {
+        // Check if user has 2nd interview or final approval cross-channel permissions
+        $canAccess2ndInterview = $user->hasAnyPermission([
+            'Candidate Assign 2nd Interview',
+            'Candidate Approve 2nd Interview',
+            'Candidate Reject 2nd Interview',
+        ]);
+
+        $canAccessFinalApproval = $user->hasAnyPermission([
+            'Candidate Approve Final',
+            'Candidate Reject Final',
+        ]);
+
+        $secondInterviewStatuses = [
+            '1st_interview_passed',
+            '2nd_interview',
+            '2nd_interview_passed',
+            '2nd_interview_rejected',
+            'final_approved',
+            'rejected',
+        ];
+
+        $finalApprovalStatuses = [
+            '2nd_interview_passed',
+            'final_approved',
+            'rejected',
+        ];
+
+        return $query->where(function ($q) use (
+            $user,
+            $employeeId,
+            $allowedUserIds,
+            $canAccess2ndInterview,
+            $canAccessFinalApproval,
+            $secondInterviewStatuses,
+            $finalApprovalStatuses
+        ) {
             // 1. Uploaded by self or any subordinate in reporting manager hierarchy
             $q->whereIn('uploaded_by', $allowedUserIds);
 
@@ -148,6 +210,16 @@ class Candidate extends Model
             $q->orWhereHas('approvals', function ($approvalQuery) use ($user) {
                 $approvalQuery->where('assigned_to_user_id', $user->id);
             });
+
+            // 4. Cross-channel access for candidates who completed 1st interview
+            if ($canAccess2ndInterview) {
+                $q->orWhereIn('status', $secondInterviewStatuses);
+            }
+
+            // 5. Cross-channel access for candidates who completed 2nd interview
+            if ($canAccessFinalApproval) {
+                $q->orWhereIn('status', $finalApprovalStatuses);
+            }
         });
     }
 
@@ -164,14 +236,51 @@ class Candidate extends Model
         $descendantUserIds = $user->getAllDescendantIds();
         $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
 
+        // 1. Uploaded by self or subordinate in hierarchy
         if (in_array($this->uploaded_by, $allowedUserIds)) {
             return true;
         }
 
+        // 2. Channel Head of candidate's channel
         if ($employeeId && $this->channel_head_employee_id == $employeeId) {
             return true;
         }
 
-        return $this->approvals()->where('assigned_to_user_id', $user->id)->exists();
+        // 3. Assigned to user in workflow approvals
+        if ($this->approvals()->where('assigned_to_user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        // 4. Cross-channel access for candidates who completed 1st interview
+        $secondInterviewStatuses = [
+            '1st_interview_passed',
+            '2nd_interview',
+            '2nd_interview_passed',
+            '2nd_interview_rejected',
+            'final_approved',
+            'rejected',
+        ];
+        if (in_array($this->status, $secondInterviewStatuses) && $user->hasAnyPermission([
+            'Candidate Assign 2nd Interview',
+            'Candidate Approve 2nd Interview',
+            'Candidate Reject 2nd Interview',
+        ])) {
+            return true;
+        }
+
+        // 5. Cross-channel access for candidates who completed 2nd interview
+        $finalApprovalStatuses = [
+            '2nd_interview_passed',
+            'final_approved',
+            'rejected',
+        ];
+        if (in_array($this->status, $finalApprovalStatuses) && $user->hasAnyPermission([
+            'Candidate Approve Final',
+            'Candidate Reject Final',
+        ])) {
+            return true;
+        }
+
+        return false;
     }
 }
