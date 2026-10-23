@@ -36,7 +36,7 @@ class CandidateController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List', ['only' => ['index', 'getCandidateList']]),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List|Candidate Assigned List', ['only' => ['index', 'getCandidateList']]),
             new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['only' => ['show', 'getApprovals', 'getInterviewers']]),
             new Middleware('permission:Candidate Create', ['only' => ['store']]),
             new Middleware('permission:Candidate Update', ['only' => ['update']]),
