@@ -213,6 +213,41 @@ class DepartmentController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * Get active designations belonging to the specified department.
+     */
+    public function getDesignations(string $id)
+    {
+        try {
+            $department = Department::find($id);
+
+            if (! $department) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Department not found',
+                ], 404);
+            }
+
+            $designations = $department->designations()
+                ->active()
+                ->orderBy('order_weight', 'desc')
+                ->orderBy('name', 'asc')
+                ->get(['id', 'name', 'code', 'department_id', 'level', 'order_weight']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Designations retrieved successfully',
+                'data' => $designations,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve designations',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
     public function toggleStatus(string $id)
     {
         try {
