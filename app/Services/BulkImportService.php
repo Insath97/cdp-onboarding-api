@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\CandidateStatus;
 use App\Models\Branch;
 use App\Models\Candidate;
 use App\Models\ChannelWiseEmployment;
 use App\Models\Country;
 use App\Models\Department;
 use App\Models\Designation;
+use App\Models\DocumentType;
 use App\Models\Employee;
 use App\Models\Group;
 use App\Models\Province;
@@ -100,6 +102,11 @@ class BulkImportService
                 'unique_key' => 'name',
                 'fillable' => ['name', 'description', 'is_active'],
             ],
+            'document_types' => [
+                'model' => DocumentType::class,
+                'unique_key' => 'document_name',
+                'fillable' => ['document_name', 'slug', 'description', 'is_required', 'is_active'],
+            ],
             'employees' => [
                 'model' => Employee::class,
                 'unique_key' => 'employee_code',
@@ -131,7 +138,7 @@ class BulkImportService
                 ],
                 'fillable' => [
                     'first_name', 'last_name', 'nic_number', 'phone_number', 'secondary_number',
-                    'designation_id', 'expected_salary', 'status', 'uploaded_by', 'uploader_comments',
+                    'designation_id', 'expected_salary', 'status', 'source', 'uploaded_by', 'uploader_comments',
                     'submitted_at', 'channel_head_employee_id', 'stage_updated_at',
                 ],
             ],
@@ -189,7 +196,7 @@ class BulkImportService
                 $results['failed']++;
                 $results['errors'][] = [
                     'row' => $rowNumber,
-                    'error' => 'Column count mismatch. Expected ' . count($headers) . ', got ' . count($rowData),
+                    'error' => 'Column count mismatch. Expected '.count($headers).', got '.count($rowData),
                 ];
 
                 continue;
@@ -216,7 +223,7 @@ class BulkImportService
                 $this->logActivity(
                     'BULK_IMPORT_ROW_FAILED',
                     'BulkImport',
-                    "Import failed for table {$table} at row {$rowNumber}: " . $e->getMessage(),
+                    "Import failed for table {$table} at row {$rowNumber}: ".$e->getMessage(),
                     ['table' => $table, 'row' => $rowNumber, 'error' => $e->getMessage()],
                     'error'
                 );
@@ -529,7 +536,7 @@ class BulkImportService
             'end_date' => '',
             'joined_at' => '2026-01-01 09:00:00',
             'expected_salary' => '120000.00',
-            'status' => 'pending',
+            'status' => CandidateStatus::PENDING->value,
             'uploader_comments' => 'CV submitted via onboarding portal.',
             'submitted_at' => '2026-09-21 10:00:00',
             'stage_updated_at' => '2026-09-21 10:00:00',

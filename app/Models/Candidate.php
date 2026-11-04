@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Enums\CandidateStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class Candidate extends Model
 {
+    public const SOURCE_DIRECT = 'direct';
+    public const SOURCE_REFERRAL = 'referral';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -23,6 +27,7 @@ class Candidate extends Model
         'expected_salary',
         'cv_path',
         'status',
+        'source',
         'uploaded_by',
         'uploader_comments',
         'submitted_at',
@@ -38,9 +43,10 @@ class Candidate extends Model
     protected function casts(): array
     {
         return [
-            'expected_salary' => 'decimal:2',
-            'submitted_at' => 'datetime',
+            'expected_salary'  => 'decimal:2',
+            'submitted_at'     => 'datetime',
             'stage_updated_at' => 'datetime',
+            'status'           => CandidateStatus::class,
         ];
     }
 
@@ -138,12 +144,17 @@ class Candidate extends Model
 
     /**
      * Scope a query to filter by candidate status.
-     * Supports single status, array of statuses, or comma-separated string (e.g., '1st_interview_passed,2nd_interview').
+     * Supports single status, array of statuses, comma-separated string, or CandidateStatus enum.
      */
     public function scopeStatus($query, $status)
     {
+        if ($status instanceof CandidateStatus) {
+            return $query->where('status', $status->value);
+        }
+
         if (is_array($status)) {
-            return $query->whereIn('status', $status);
+            $statuses = array_map(fn ($s) => $s instanceof CandidateStatus ? $s->value : $s, $status);
+            return $query->whereIn('status', $statuses);
         }
 
         if (is_string($status) && str_contains($status, ',')) {
@@ -159,12 +170,17 @@ class Candidate extends Model
      */
     public function scopeStage($query, string $stage)
     {
-        return match ($stage) {
-            '1st_interview'  => $query->whereIn('status', ['pending', '1st_interview', '1st_interview_rejected']),
-            '2nd_interview'  => $query->whereIn('status', ['1st_interview_passed', '2nd_interview', '2nd_interview_rejected']),
-            'final_approval' => $query->whereIn('status', ['2nd_interview_passed', 'final_approved', 'rejected']),
-            default          => $query,
-        };
+        $statuses = CandidateStatus::forStage($stage);
+
+        return ! empty($statuses) ? $query->whereIn('status', $statuses) : $query;
+    }
+
+    /**
+     * Scope a query to filter by candidate CV submission source.
+     */
+    public function scopeSource($query, string $source)
+    {
+        return $query->where('source', $source);
     }
 
     /**
@@ -200,26 +216,9 @@ class Candidate extends Model
             'Candidate Reject Final',
         ]);
 
-        $secondInterviewStatuses = [
-            '1st_interview_passed',
-            '2nd_interview',
-            '2nd_interview_passed',
-            '2nd_interview_rejected',
-            'final_approved',
-            'rejected',
-        ];
-
-        $finalApprovalStatuses = [
-            '2nd_interview_passed',
-            'final_approved',
-            'rejected',
-        ];
-
-        $secondInterviewStageStatuses = [
-            '1st_interview_passed',
-            '2nd_interview',
-            '2nd_interview_rejected',
-        ];
+        $secondInterviewStatuses = CandidateStatus::secondInterviewPool();
+        $finalApprovalStatuses = CandidateStatus::finalApprovalPool();
+        $secondInterviewStageStatuses = CandidateStatus::secondInterviewStageStatuses();
 
         return $query->where(function ($q) use (
             $user,
@@ -290,40 +289,24 @@ class Candidate extends Model
             return true;
         }
 
+        $statusValue = $this->status instanceof CandidateStatus ? $this->status->value : (string) $this->status;
+
         // 4. Cross-channel access for assigners of the 2nd interview pool
-        $secondInterviewStatuses = [
-            '1st_interview_passed',
-            '2nd_interview',
-            '2nd_interview_passed',
-            '2nd_interview_rejected',
-            'final_approved',
-            'rejected',
-        ];
-        if (in_array($this->status, $secondInterviewStatuses) && $user->hasAnyPermission([
+        if (in_array($statusValue, CandidateStatus::secondInterviewPool()) && $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
         ])) {
             return true;
         }
 
         // 5. View-only access to the 2nd interview list (stage 2 statuses)
-        $secondInterviewStageStatuses = [
-            '1st_interview_passed',
-            '2nd_interview',
-            '2nd_interview_rejected',
-        ];
-        if (in_array($this->status, $secondInterviewStageStatuses) && $user->hasAnyPermission([
+        if (in_array($statusValue, CandidateStatus::secondInterviewStageStatuses()) && $user->hasAnyPermission([
             'Candidate 2nd Interview List',
         ])) {
             return true;
         }
 
         // 6. Cross-channel access for candidates who completed 2nd interview
-        $finalApprovalStatuses = [
-            '2nd_interview_passed',
-            'final_approved',
-            'rejected',
-        ];
-        if (in_array($this->status, $finalApprovalStatuses) && $user->hasAnyPermission([
+        if (in_array($statusValue, CandidateStatus::finalApprovalPool()) && $user->hasAnyPermission([
             'Candidate Approve Final',
             'Candidate Reject Final',
         ])) {

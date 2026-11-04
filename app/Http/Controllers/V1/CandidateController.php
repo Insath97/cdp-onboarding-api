@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Enums\CandidateStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateCandidateRequest;
 use App\Http\Requests\UpdateCandidateRequest;
@@ -83,13 +84,18 @@ class CandidateController extends Controller implements HasMiddleware
                 $query->where('designation_id', $request->designation_id);
             }
 
+            // Source filter (direct, referral)
+            if ($request->filled('source')) {
+                $query->source($request->source);
+            }
+
             $candidates = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
             $this->logActivity(
                 'GET_ALL',
                 'Candidate',
                 'Retrieved candidate listing',
-                $request->only(['search', 'status', 'stage', 'designation_id', 'per_page', 'page'])
+                $request->only(['search', 'status', 'stage', 'designation_id', 'source', 'per_page', 'page'])
             );
 
             return response()->json([
@@ -122,7 +128,8 @@ class CandidateController extends Controller implements HasMiddleware
             }
 
             // 2. Set submission parameters
-            $data['status'] = 'pending';
+            $data['status'] = CandidateStatus::PENDING->value;
+            $data['source'] = $request->input('source', Candidate::SOURCE_REFERRAL);
             $data['submitted_at'] = now();
             $data['uploaded_by'] = $user->id;
 
@@ -330,8 +337,13 @@ class CandidateController extends Controller implements HasMiddleware
                 $query->stage($request->stage);
             }
 
+            // Source filter (direct, referral)
+            if ($request->filled('source')) {
+                $query->source($request->source);
+            }
+
             $candidates = $query->orderBy('first_name', 'asc')
-                                ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id', 'status']);
+                                ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id', 'status', 'source']);
 
             $this->logActivity('GET_LIST', 'Candidate', 'Retrieved candidate select box list');
 
@@ -445,10 +457,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['pending', '1st_interview'])) {
+            if (! in_array($candidate->status, [CandidateStatus::PENDING, CandidateStatus::FIRST_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be assigned at current stage (status: {$candidate->status})",
+                    'message' => "Candidate cannot be assigned at current stage (status: {$candidate->status->value})",
                 ], 422);
             }
 
@@ -466,7 +478,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'              => 'pending',
             ]);
 
-            $candidate->status = '1st_interview';
+            $candidate->status = CandidateStatus::FIRST_INTERVIEW;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -524,10 +536,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['pending', '1st_interview'])) {
+            if (! in_array($candidate->status, [CandidateStatus::PENDING, CandidateStatus::FIRST_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "1st interview cannot be approved for candidate with status: {$candidate->status}",
+                    'message' => "1st interview cannot be approved for candidate with status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -544,7 +556,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'completed',
             ]);
 
-            $candidate->status = '1st_interview_passed';
+            $candidate->status = CandidateStatus::FIRST_INTERVIEW_PASSED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -602,10 +614,15 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (in_array($candidate->status, ['1st_interview_passed', '1st_interview_rejected', 'final_approved', 'rejected'])) {
+            if (in_array($candidate->status, [
+                CandidateStatus::FIRST_INTERVIEW_PASSED,
+                CandidateStatus::FIRST_INTERVIEW_REJECTED,
+                CandidateStatus::FINAL_APPROVED,
+                CandidateStatus::REJECTED,
+            ], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be rejected from status: {$candidate->status}",
+                    'message' => "Candidate cannot be rejected from status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -622,7 +639,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'rejected',
             ]);
 
-            $candidate->status = '1st_interview_rejected';
+            $candidate->status = CandidateStatus::FIRST_INTERVIEW_REJECTED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -725,10 +742,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['1st_interview_passed', '2nd_interview'])) {
+            if (! in_array($candidate->status, [CandidateStatus::FIRST_INTERVIEW_PASSED, CandidateStatus::SECOND_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate 2nd interview cannot be assigned at current status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview cannot be assigned at current status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -745,7 +762,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'              => 'pending',
             ]);
 
-            $candidate->status = '2nd_interview';
+            $candidate->status = CandidateStatus::SECOND_INTERVIEW;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -803,10 +820,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if ($candidate->status !== '2nd_interview') {
+            if ($candidate->status !== CandidateStatus::SECOND_INTERVIEW) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate 2nd interview must be assigned before approval. Current status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview must be assigned before approval. Current status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -831,7 +848,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'completed',
             ]);
 
-            $candidate->status = '2nd_interview_passed';
+            $candidate->status = CandidateStatus::SECOND_INTERVIEW_PASSED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -889,10 +906,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if ($candidate->status !== '2nd_interview') {
+            if ($candidate->status !== CandidateStatus::SECOND_INTERVIEW) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate 2nd interview must be assigned before rejection. Current status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview must be assigned before rejection. Current status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -917,7 +934,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'rejected',
             ]);
 
-            $candidate->status = '2nd_interview_rejected';
+            $candidate->status = CandidateStatus::SECOND_INTERVIEW_REJECTED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -976,10 +993,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if ($candidate->status !== '2nd_interview_passed') {
+            if ($candidate->status !== CandidateStatus::SECOND_INTERVIEW_PASSED) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate final approval requires '2nd_interview_passed' status. Current status: {$candidate->status}",
+                    'message' => "Candidate final approval requires '2nd_interview_passed' status. Current status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -995,7 +1012,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'completed',
             ]);
 
-            $candidate->status = 'final_approved';
+            $candidate->status = CandidateStatus::FINAL_APPROVED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -1053,10 +1070,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (in_array($candidate->status, ['final_approved', 'rejected'])) {
+            if (in_array($candidate->status, [CandidateStatus::FINAL_APPROVED, CandidateStatus::REJECTED], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be rejected from final closed status: {$candidate->status}",
+                    'message' => "Candidate cannot be rejected from final closed status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -1072,7 +1089,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'rejected',
             ]);
 
-            $candidate->status = 'rejected';
+            $candidate->status = CandidateStatus::REJECTED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 

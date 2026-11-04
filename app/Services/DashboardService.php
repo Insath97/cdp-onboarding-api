@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\CandidateStatus;
 use App\Models\Candidate;
 use App\Models\User;
 use App\Traits\ActivityLogTrait;
@@ -29,24 +30,24 @@ class DashboardService
         // 2. Compute Top KPI Cards
         $totalCandidates = array_sum($statusCounts);
         $inProgress = (int) (
-            ($statusCounts['pending'] ?? 0) +
-            ($statusCounts['1st_interview'] ?? 0) +
-            ($statusCounts['1st_interview_passed'] ?? 0) +
-            ($statusCounts['2nd_interview'] ?? 0) +
-            ($statusCounts['2nd_interview_passed'] ?? 0)
+            ($statusCounts[CandidateStatus::PENDING->value] ?? 0) +
+            ($statusCounts[CandidateStatus::FIRST_INTERVIEW->value] ?? 0) +
+            ($statusCounts[CandidateStatus::FIRST_INTERVIEW_PASSED->value] ?? 0) +
+            ($statusCounts[CandidateStatus::SECOND_INTERVIEW->value] ?? 0) +
+            ($statusCounts[CandidateStatus::SECOND_INTERVIEW_PASSED->value] ?? 0)
         );
-        $hired = (int) ($statusCounts['final_approved'] ?? 0);
+        $hired = (int) ($statusCounts[CandidateStatus::FINAL_APPROVED->value] ?? 0);
         $rejected = (int) (
-            ($statusCounts['1st_interview_rejected'] ?? 0) +
-            ($statusCounts['2nd_interview_rejected'] ?? 0) +
-            ($statusCounts['rejected'] ?? 0)
+            ($statusCounts[CandidateStatus::FIRST_INTERVIEW_REJECTED->value] ?? 0) +
+            ($statusCounts[CandidateStatus::SECOND_INTERVIEW_REJECTED->value] ?? 0) +
+            ($statusCounts[CandidateStatus::REJECTED->value] ?? 0)
         );
 
         // 3. Compute Hiring Pipeline Funnel
         $pipeline = [
-            'cv_submitted'     => (int) ($statusCounts['pending'] ?? 0),
-            'first_interview'  => (int) (($statusCounts['1st_interview'] ?? 0) + ($statusCounts['1st_interview_passed'] ?? 0)),
-            'second_interview' => (int) (($statusCounts['2nd_interview'] ?? 0) + ($statusCounts['2nd_interview_passed'] ?? 0)),
+            'cv_submitted'     => (int) ($statusCounts[CandidateStatus::PENDING->value] ?? 0),
+            'first_interview'  => (int) (($statusCounts[CandidateStatus::FIRST_INTERVIEW->value] ?? 0) + ($statusCounts[CandidateStatus::FIRST_INTERVIEW_PASSED->value] ?? 0)),
+            'second_interview' => (int) (($statusCounts[CandidateStatus::SECOND_INTERVIEW->value] ?? 0) + ($statusCounts[CandidateStatus::SECOND_INTERVIEW_PASSED->value] ?? 0)),
             'hired'            => $hired,
         ];
 
@@ -112,22 +113,17 @@ class DashboardService
     /**
      * Convert technical database status to a human-readable UI stage label.
      *
-     * @param string $status
+     * @param CandidateStatus|string $status
      * @return string
      */
-    protected function formatStageLabel(string $status): string
+    protected function formatStageLabel(CandidateStatus|string $status): string
     {
-        return match ($status) {
-            'pending'                => 'CV Submitted',
-            '1st_interview'          => '1st Interview',
-            '1st_interview_passed'   => '1st Interview Passed',
-            '1st_interview_rejected' => '1st Interview Rejected',
-            '2nd_interview'          => '2nd Interview',
-            '2nd_interview_passed'   => '2nd Interview Passed',
-            '2nd_interview_rejected' => '2nd Interview Rejected',
-            'final_approved'         => 'Hired',
-            'rejected'               => 'Rejected',
-            default                  => ucwords(str_replace('_', ' ', $status)),
-        };
+        if ($status instanceof CandidateStatus) {
+            return $status->label();
+        }
+
+        $enumStatus = CandidateStatus::tryFrom($status);
+
+        return $enumStatus ? $enumStatus->label() : ucwords(str_replace('_', ' ', $status));
     }
 }

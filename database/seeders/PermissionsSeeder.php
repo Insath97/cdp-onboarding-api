@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -96,6 +95,13 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Channel Wise Employment Delete', 'group_name' => 'Channel Wise Employment Management Permissions'],
             ['name' => 'Channel Wise Employment Toggle Status', 'group_name' => 'Channel Wise Employment Management Permissions'],
 
+            /* Document Type Management */
+            ['name' => 'Document Type Index', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Create', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Update', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Delete', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Toggle Status', 'group_name' => 'Document Type Management Permissions'],
+
             /* Activity Log Management */
             ['name' => 'Activity Log Index', 'group_name' => 'Activity Log Management Permissions'],
 
@@ -133,6 +139,10 @@ class PermissionsSeeder extends Seeder
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
+
+            /* Report Management */
+            ['name' => 'Report View', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Channel Wise View', 'group_name' => 'Report Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
