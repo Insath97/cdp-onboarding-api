@@ -15,13 +15,16 @@ use App\Http\Requests\Reject2ndInterviewRequest;
 use App\Http\Requests\ApproveFinalRequest;
 use App\Http\Requests\RejectFinalRequest;
 use App\Models\Candidate;
+use App\Models\CandidateDocument;
 use App\Models\ChannelHeadHistory;
+use App\Models\DocumentType;
 use App\Models\InterviewApproval;
 use App\Models\User;
 use App\Notifications\CandidateSubmittedNotification;
 use App\Notifications\CandidateInterviewAssignedNotification;
 use App\Notifications\CandidateStageStatusNotification;
 use App\Traits\ActivityLogTrait;
+use App\Traits\CandidateSmsTrait;
 use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -29,7 +32,7 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class CandidateController extends Controller implements HasMiddleware
 {
-    use ActivityLogTrait, FileUploadTrait;
+    use ActivityLogTrait, CandidateSmsTrait, FileUploadTrait;
 
     /**
      * Define the middleware for this controller.
@@ -38,7 +41,8 @@ class CandidateController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List|Candidate Assigned List', ['index', 'getCandidateList']),
-            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['show', 'getApprovals', 'getInterviewers']),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['show', 'getApprovals', 'getInterviewers', 'getDocuments']),
+            new Middleware('permission:Candidate Update|Candidate Assign 1st Interview', ['verifyDocuments', 'rejectDocuments', 'resendDocumentLink']),
             new Middleware('permission:Candidate Create', ['store']),
             new Middleware('permission:Candidate Update', ['update']),
             new Middleware('permission:Candidate Delete', ['destroy']),
@@ -160,6 +164,9 @@ class CandidateController extends Controller implements HasMiddleware
                     $headUser->notify(new CandidateSubmittedNotification($candidate));
                 }
             }
+
+            // 6. Send Document Upload Link SMS to Candidate
+            $this->sendDocumentUploadSms($candidate);
 
             $this->logActivity(
                 'CREATE',
@@ -457,10 +464,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, [CandidateStatus::PENDING, CandidateStatus::FIRST_INTERVIEW], true)) {
+            if (! in_array($candidate->status, [CandidateStatus::DOCUMENT_VERIFIED, CandidateStatus::FIRST_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be assigned at current stage (status: {$candidate->status->value})",
+                    'message' => "Candidate 1st interview can only be assigned after documents are verified. Current status: {$candidate->status->label()}",
                 ], 422);
             }
 
@@ -1118,6 +1125,275 @@ class CandidateController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to reject candidate',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Retrieve all uploaded documents for a candidate with document specifications.
+     */
+    public function getDocuments(string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents',
+                ], 403);
+            }
+
+            $documents = CandidateDocument::with([
+                'documentType:id,document_name,slug,description,is_required',
+                'verifiedByUser:id,name,email',
+            ])->where('candidate_id', $candidate->id)->get();
+
+            $allDocTypes = DocumentType::active()->get();
+            $uploadedDocTypeIds = $documents->pluck('document_type_id')->toArray();
+            $missingRequired = $allDocTypes->where('is_required', true)
+                ->reject(fn ($dt) => in_array($dt->id, $uploadedDocTypeIds))
+                ->values();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate documents retrieved successfully',
+                'data' => [
+                    'candidate_id'     => $candidate->id,
+                    'candidate_code'   => $candidate->candidate_code,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'documents'        => $documents,
+                    'missing_required' => $missingRequired,
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve candidate documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Staff verification of candidate documents (moves candidate to 'document_verified').
+     */
+    public function verifyDocuments(Request $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents',
+                ], 403);
+            }
+
+            $query = CandidateDocument::where('candidate_id', $candidate->id);
+            if ($request->filled('document_ids') && is_array($request->document_ids)) {
+                $query->whereIn('id', $request->document_ids);
+            }
+
+            $query->update([
+                'status'           => 'verified',
+                'verified_by'      => $user->id,
+                'verified_at'      => now(),
+                'rejection_reason' => null,
+            ]);
+
+            // Check if all mandatory active document types are now verified
+            $verifiedDocTypeIds = CandidateDocument::where('candidate_id', $candidate->id)
+                ->where('status', 'verified')
+                ->pluck('document_type_id')
+                ->toArray();
+
+            $requiredDocTypeIds = DocumentType::active()->required()->pluck('id')->toArray();
+            $allRequiredVerified = count(array_diff($requiredDocTypeIds, $verifiedDocTypeIds)) === 0;
+
+            if ($allRequiredVerified) {
+                $candidate->status = CandidateStatus::DOCUMENT_VERIFIED;
+                $candidate->stage_updated_at = now();
+                $candidate->save();
+            }
+
+            $this->logActivity(
+                'VERIFY_DOCUMENTS',
+                'Candidate',
+                "Verified onboarding documents for candidate {$candidate->full_name} (Code: {$candidate->candidate_code})",
+                [
+                    'candidate_id' => $candidate->id,
+                    'new_status'   => $candidate->status->value,
+                ]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $allRequiredVerified
+                    ? 'All required documents verified successfully. Candidate is now ready for 1st Interview!'
+                    : 'Documents verified. Some required documents are still pending verification.',
+                'data' => [
+                    'candidate_id'     => $candidate->id,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'documents'        => CandidateDocument::with('documentType:id,document_name,slug,is_required')
+                        ->where('candidate_id', $candidate->id)->get(),
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to verify candidate documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Staff rejection of candidate document(s) with reason (moves candidate to 'document_rejected' and regenerates link).
+     */
+    public function rejectDocuments(Request $request, string $id)
+    {
+        $request->validate([
+            'rejections'                  => 'required|array|min:1',
+            'rejections.*.document_id'    => 'required|integer|exists:candidate_documents,id',
+            'rejections.*.reason'         => 'required|string|max:500',
+        ]);
+
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents',
+                ], 403);
+            }
+
+            foreach ($request->rejections as $rej) {
+                CandidateDocument::where('id', $rej['document_id'])
+                    ->where('candidate_id', $candidate->id)
+                    ->update([
+                        'status'           => 'rejected',
+                        'rejection_reason' => $rej['reason'],
+                        'verified_by'      => $user->id,
+                        'verified_at'      => now(),
+                    ]);
+            }
+
+            // Regenerate upload token and set status to document_rejected
+            $candidate->document_upload_token = \Illuminate\Support\Str::random(40);
+            $candidate->status = CandidateStatus::DOCUMENT_REJECTED;
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            // Trigger re-upload link SMS
+            $this->sendDocumentUploadSms($candidate);
+
+            $this->logActivity(
+                'REJECT_DOCUMENTS',
+                'Candidate',
+                "Rejected document(s) for candidate {$candidate->full_name}. Re-upload requested.",
+                ['candidate_id' => $candidate->id, 'new_status' => CandidateStatus::DOCUMENT_REJECTED->value],
+                'warning'
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Documents rejected. A new upload link has been dispatched to candidate mobile.',
+                'data' => [
+                    'candidate_id'     => $candidate->id,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'upload_token'     => $candidate->document_upload_token,
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reject documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Resend document upload link SMS to candidate.
+     */
+    public function resendDocumentLink(string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record',
+                ], 403);
+            }
+
+            if (empty($candidate->document_upload_token)) {
+                $candidate->document_upload_token = \Illuminate\Support\Str::random(40);
+                $candidate->save();
+            }
+
+            $sent = $this->sendDocumentUploadSms($candidate);
+
+            $this->logActivity(
+                'RESEND_DOCUMENT_LINK',
+                'Candidate',
+                "Resent document upload link to candidate {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'phone_number' => $candidate->phone_number]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $sent
+                    ? 'Document upload link SMS resent successfully.'
+                    : 'Document upload link generated, but SMS gateway did not confirm dispatch.',
+                'data' => [
+                    'candidate_code' => $candidate->candidate_code,
+                    'upload_url'     => $candidate->getDocumentUploadUrl(),
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to resend document link',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }

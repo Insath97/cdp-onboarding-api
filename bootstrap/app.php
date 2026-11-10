@@ -12,6 +12,7 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\VerifyPortalApiKey;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -37,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'sanitize.input' => SanitizeInput::class,
             'security.headers' => SecurityHeaders::class,
+            'portal.key' => VerifyPortalApiKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

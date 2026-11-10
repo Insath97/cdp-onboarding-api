@@ -5,6 +5,9 @@ namespace App\Enums;
 enum CandidateStatus: string
 {
     case PENDING = 'pending';
+    case DOCUMENT_SUBMITTED = 'document_submitted';
+    case DOCUMENT_VERIFIED = 'document_verified';
+    case DOCUMENT_REJECTED = 'document_rejected';
     case FIRST_INTERVIEW = '1st_interview';
     case FIRST_INTERVIEW_PASSED = '1st_interview_passed';
     case FIRST_INTERVIEW_REJECTED = '1st_interview_rejected';
@@ -21,6 +24,9 @@ enum CandidateStatus: string
     {
         return match ($this) {
             self::PENDING => 'CV Submitted',
+            self::DOCUMENT_SUBMITTED => 'Documents Submitted',
+            self::DOCUMENT_VERIFIED => 'Documents Verified',
+            self::DOCUMENT_REJECTED => 'Documents Rejected',
             self::FIRST_INTERVIEW => '1st Interview',
             self::FIRST_INTERVIEW_PASSED => '1st Interview Passed',
             self::FIRST_INTERVIEW_REJECTED => '1st Interview Rejected',
@@ -39,6 +45,9 @@ enum CandidateStatus: string
     {
         return match ($this) {
             self::PENDING,
+            self::DOCUMENT_SUBMITTED,
+            self::DOCUMENT_VERIFIED,
+            self::DOCUMENT_REJECTED,
             self::FIRST_INTERVIEW,
             self::FIRST_INTERVIEW_REJECTED => '1st_interview',
 
@@ -65,6 +74,7 @@ enum CandidateStatus: string
     /**
      * Statuses associated with a given workflow stage.
      *
+     * @param string $stage
      * @return array<string>
      */
     public static function forStage(string $stage): array
@@ -72,6 +82,9 @@ enum CandidateStatus: string
         return match ($stage) {
             '1st_interview' => [
                 self::PENDING->value,
+                self::DOCUMENT_SUBMITTED->value,
+                self::DOCUMENT_VERIFIED->value,
+                self::DOCUMENT_REJECTED->value,
                 self::FIRST_INTERVIEW->value,
                 self::FIRST_INTERVIEW_REJECTED->value,
             ],
@@ -127,6 +140,9 @@ enum CandidateStatus: string
     {
         return in_array($this, [
             self::PENDING,
+            self::DOCUMENT_SUBMITTED,
+            self::DOCUMENT_VERIFIED,
+            self::DOCUMENT_REJECTED,
             self::FIRST_INTERVIEW,
             self::FIRST_INTERVIEW_PASSED,
             self::SECOND_INTERVIEW,
@@ -156,6 +172,9 @@ enum CandidateStatus: string
     {
         return [
             self::PENDING->value,
+            self::DOCUMENT_SUBMITTED->value,
+            self::DOCUMENT_VERIFIED->value,
+            self::DOCUMENT_REJECTED->value,
             self::FIRST_INTERVIEW->value,
             self::FIRST_INTERVIEW_PASSED->value,
             self::SECOND_INTERVIEW->value,

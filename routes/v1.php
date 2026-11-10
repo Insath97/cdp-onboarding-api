@@ -25,7 +25,7 @@ use App\Http\Controllers\V1\UserController;
 use App\Http\Controllers\V1\ZonalController;
 use Illuminate\Support\Facades\Route;
 
-/* public routes */
+/* version 1 routes (JWT protected) */
 
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
@@ -146,6 +146,13 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('list', [CandidateController::class, 'getCandidateList']);
         Route::get('interviewers', [CandidateController::class, 'getInterviewers']);
         Route::get('{id}/approvals', [CandidateController::class, 'getApprovals']);
+
+        // Document Review & Verification
+        Route::get('{id}/documents', [CandidateController::class, 'getDocuments']);
+        Route::post('{id}/documents/verify', [CandidateController::class, 'verifyDocuments']);
+        Route::post('{id}/documents/reject', [CandidateController::class, 'rejectDocuments']);
+        Route::post('{id}/resend-document-link', [CandidateController::class, 'resendDocumentLink']);
+
         // Stage 1
         Route::post('{id}/assign-1st-interview', [CandidateController::class, 'assign1stInterview']);
         Route::post('{id}/approve-1st-interview', [CandidateController::class, 'approve1stInterview']);
