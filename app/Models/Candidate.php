@@ -285,6 +285,11 @@ class Candidate extends Model
         $descendantUserIds = $user->getAllDescendantIds();
         $allowedUserIds = array_unique(array_merge([$user->id], $descendantUserIds));
 
+        // Users with 'Candidate Assign 1st Interview' manage the 1st interview pool (review docs, assign interviewers)
+        $canAccess1stInterview = $user->hasAnyPermission([
+            'Candidate Assign 1st Interview',
+        ]);
+
         // Users with 'Candidate Assign 2nd Interview' manage the 2nd interview pool (assign interviewers)
         $canAccess2ndInterview = $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
@@ -300,6 +305,7 @@ class Candidate extends Model
             'Candidate Reject Final',
         ]);
 
+        $firstInterviewStatuses = CandidateStatus::firstInterviewPool();
         $secondInterviewStatuses = CandidateStatus::secondInterviewPool();
         $finalApprovalStatuses = CandidateStatus::finalApprovalPool();
         $secondInterviewStageStatuses = CandidateStatus::secondInterviewStageStatuses();
@@ -308,9 +314,11 @@ class Candidate extends Model
             $user,
             $employeeId,
             $allowedUserIds,
+            $canAccess1stInterview,
             $canAccess2ndInterview,
             $canView2ndList,
             $canAccessFinalApproval,
+            $firstInterviewStatuses,
             $secondInterviewStatuses,
             $finalApprovalStatuses,
             $secondInterviewStageStatuses
@@ -328,17 +336,22 @@ class Candidate extends Model
                 $approvalQuery->where('assigned_to_user_id', $user->id);
             });
 
-            // 4. Cross-channel access for candidates who completed 1st interview
+            // 4. Cross-channel access for the 1st-interview pool (documents submitted onwards)
+            if ($canAccess1stInterview) {
+                $q->orWhereIn('status', $firstInterviewStatuses);
+            }
+
+            // 5. Cross-channel access for candidates who completed 1st interview
             if ($canAccess2ndInterview) {
                 $q->orWhereIn('status', $secondInterviewStatuses);
             }
 
-            // 5. View-only access to the 2nd interview list (stage 2 statuses)
+            // 6. View-only access to the 2nd interview list (stage 2 statuses)
             if ($canView2ndList) {
                 $q->orWhereIn('status', $secondInterviewStageStatuses);
             }
 
-            // 6. Cross-channel access for candidates who completed 2nd interview
+            // 7. Cross-channel access for candidates who completed 2nd interview
             if ($canAccessFinalApproval) {
                 $q->orWhereIn('status', $finalApprovalStatuses);
             }
@@ -375,21 +388,28 @@ class Candidate extends Model
 
         $statusValue = $this->status instanceof CandidateStatus ? $this->status->value : (string) $this->status;
 
-        // 4. Cross-channel access for assigners of the 2nd interview pool
+        // 4. Cross-channel access for the 1st-interview pool (documents submitted onwards)
+        if (in_array($statusValue, CandidateStatus::firstInterviewPool()) && $user->hasAnyPermission([
+            'Candidate Assign 1st Interview',
+        ])) {
+            return true;
+        }
+
+        // 5. Cross-channel access for assigners of the 2nd interview pool
         if (in_array($statusValue, CandidateStatus::secondInterviewPool()) && $user->hasAnyPermission([
             'Candidate Assign 2nd Interview',
         ])) {
             return true;
         }
 
-        // 5. View-only access to the 2nd interview list (stage 2 statuses)
+        // 6. View-only access to the 2nd interview list (stage 2 statuses)
         if (in_array($statusValue, CandidateStatus::secondInterviewStageStatuses()) && $user->hasAnyPermission([
             'Candidate 2nd Interview List',
         ])) {
             return true;
         }
 
-        // 6. Cross-channel access for candidates who completed 2nd interview
+        // 7. Cross-channel access for candidates who completed 2nd interview
         if (in_array($statusValue, CandidateStatus::finalApprovalPool()) && $user->hasAnyPermission([
             'Candidate Approve Final',
             'Candidate Reject Final',

@@ -103,6 +103,23 @@ enum CandidateStatus: string
     }
 
     /**
+     * Statuses accessible to users with 1st interview management permissions.
+     * Stages where the assigner reviews documents and assigns the interview.
+     * 'pending' is excluded — it stays with the uploader's own hierarchy.
+     *
+     * @return array<string>
+     */
+    public static function firstInterviewPool(): array
+    {
+        return [
+            self::DOCUMENT_SUBMITTED->value,
+            self::DOCUMENT_VERIFIED->value,
+            self::DOCUMENT_REJECTED->value,
+            self::FIRST_INTERVIEW->value,
+        ];
+    }
+
+    /**
      * Statuses accessible to users with 2nd interview management permissions.
      *
      * @return array<string>
