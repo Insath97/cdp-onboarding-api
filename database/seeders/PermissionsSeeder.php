@@ -126,6 +126,10 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Employee Hierarchy View', 'group_name' => 'Employee Hierarchy Management Permissions'],
             ['name' => 'Employee Hierarchy Reassign', 'group_name' => 'Employee Hierarchy Management Permissions'],
 
+            /* Channel Head Management */
+            ['name' => 'Channel Head Index', 'group_name' => 'Channel Head Management Permissions'],
+            ['name' => 'Channel Head Assign', 'group_name' => 'Channel Head Management Permissions'],
+
             /* System Notifications Management */
             ['name' => 'Notification Index', 'group_name' => 'System Notifications Management Permissions'],
             ['name' => 'Notification Mark Read', 'group_name' => 'System Notifications Management Permissions'],
