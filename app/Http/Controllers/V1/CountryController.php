@@ -21,11 +21,11 @@ class CountryController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Country Index', ['only' => ['index', 'show']]),
-            new Middleware('permission:Country Create', ['only' => ['store']]),
-            new Middleware('permission:Country Update', ['only' => ['update']]),
-            new Middleware('permission:Country Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Country Toggle Status', ['only' => ['toggleStatus']]),
+            new Middleware('permission:Country Index', ['index', 'show']),
+            new Middleware('permission:Country Create', ['store']),
+            new Middleware('permission:Country Update', ['update']),
+            new Middleware('permission:Country Delete', ['destroy']),
+            new Middleware('permission:Country Toggle Status', ['toggleStatus']),
         ];
     }
 

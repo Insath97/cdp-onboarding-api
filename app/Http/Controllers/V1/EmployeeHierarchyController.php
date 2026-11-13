@@ -25,8 +25,8 @@ class EmployeeHierarchyController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Employee Hierarchy View', ['only' => ['getHistory', 'getHierarchyAsOf']]),
-            new Middleware('permission:Employee Hierarchy Reassign', ['only' => ['reassignManager']]),
+            new Middleware('permission:Employee Hierarchy View', ['getHistory', 'getHierarchyAsOf']),
+            new Middleware('permission:Employee Hierarchy Reassign', ['reassignManager']),
         ];
     }
 

@@ -7,6 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $channel_wise_employment_id
+ * @property int $employee_id
+ * @property \Illuminate\Support\Carbon|null $effective_from
+ * @property \Illuminate\Support\Carbon|null $effective_to
+ * @property string|null $remarks
+ * @property int|null $changed_by
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class ChannelHeadHistory extends Model
 {
     use HasFactory;

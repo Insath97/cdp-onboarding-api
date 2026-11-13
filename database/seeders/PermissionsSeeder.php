@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -96,6 +95,13 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Channel Wise Employment Delete', 'group_name' => 'Channel Wise Employment Management Permissions'],
             ['name' => 'Channel Wise Employment Toggle Status', 'group_name' => 'Channel Wise Employment Management Permissions'],
 
+            /* Document Type Management */
+            ['name' => 'Document Type Index', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Create', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Update', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Delete', 'group_name' => 'Document Type Management Permissions'],
+            ['name' => 'Document Type Toggle Status', 'group_name' => 'Document Type Management Permissions'],
+
             /* Activity Log Management */
             ['name' => 'Activity Log Index', 'group_name' => 'Activity Log Management Permissions'],
 
@@ -111,12 +117,18 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Candidate Assign 2nd Interview', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Approve 2nd Interview', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Reject 2nd Interview', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate 2nd Interview List', 'group_name' => 'Candidate Management Permissions'],
+            ['name' => 'Candidate Assigned List', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Approve Final', 'group_name' => 'Candidate Management Permissions'],
             ['name' => 'Candidate Reject Final', 'group_name' => 'Candidate Management Permissions'],
 
             /* Employee Hierarchy Management */
             ['name' => 'Employee Hierarchy View', 'group_name' => 'Employee Hierarchy Management Permissions'],
             ['name' => 'Employee Hierarchy Reassign', 'group_name' => 'Employee Hierarchy Management Permissions'],
+
+            /* Channel Head Management */
+            ['name' => 'Channel Head Index', 'group_name' => 'Channel Head Management Permissions'],
+            ['name' => 'Channel Head Assign', 'group_name' => 'Channel Head Management Permissions'],
 
             /* System Notifications Management */
             ['name' => 'Notification Index', 'group_name' => 'System Notifications Management Permissions'],
@@ -131,6 +143,10 @@ class PermissionsSeeder extends Seeder
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
+
+            /* Report Management */
+            ['name' => 'Report View', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Channel Wise View', 'group_name' => 'Report Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
@@ -145,5 +161,7 @@ class PermissionsSeeder extends Seeder
 
         $allPermissions = Permission::all();
         $role->syncPermissions($allPermissions);
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

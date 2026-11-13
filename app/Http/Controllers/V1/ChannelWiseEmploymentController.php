@@ -21,11 +21,11 @@ class ChannelWiseEmploymentController extends Controller implements HasMiddlewar
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Channel Wise Employment Index', ['only' => ['index', 'show']]),
-            new Middleware('permission:Channel Wise Employment Create', ['only' => ['store']]),
-            new Middleware('permission:Channel Wise Employment Update', ['only' => ['update']]),
-            new Middleware('permission:Channel Wise Employment Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Channel Wise Employment Toggle Status', ['only' => ['toggleStatus']]),
+            new Middleware('permission:Channel Wise Employment Index', ['index', 'show']),
+            new Middleware('permission:Channel Wise Employment Create', ['store']),
+            new Middleware('permission:Channel Wise Employment Update', ['update']),
+            new Middleware('permission:Channel Wise Employment Delete', ['destroy']),
+            new Middleware('permission:Channel Wise Employment Toggle Status', ['toggleStatus']),
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Enums\CandidateStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateCandidateRequest;
 use App\Http\Requests\UpdateCandidateRequest;
@@ -14,13 +15,16 @@ use App\Http\Requests\Reject2ndInterviewRequest;
 use App\Http\Requests\ApproveFinalRequest;
 use App\Http\Requests\RejectFinalRequest;
 use App\Models\Candidate;
+use App\Models\CandidateDocument;
 use App\Models\ChannelHeadHistory;
+use App\Models\DocumentType;
 use App\Models\InterviewApproval;
 use App\Models\User;
 use App\Notifications\CandidateSubmittedNotification;
 use App\Notifications\CandidateInterviewAssignedNotification;
 use App\Notifications\CandidateStageStatusNotification;
 use App\Traits\ActivityLogTrait;
+use App\Traits\CandidateSmsTrait;
 use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -28,7 +32,7 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class CandidateController extends Controller implements HasMiddleware
 {
-    use ActivityLogTrait, FileUploadTrait;
+    use ActivityLogTrait, CandidateSmsTrait, FileUploadTrait;
 
     /**
      * Define the middleware for this controller.
@@ -36,23 +40,25 @@ class CandidateController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Candidate Index', ['only' => ['index', 'show', 'getCandidateList', 'getApprovals']]),
-            new Middleware('permission:Candidate Create', ['only' => ['store']]),
-            new Middleware('permission:Candidate Update', ['only' => ['update']]),
-            new Middleware('permission:Candidate Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Candidate Assign 1st Interview', ['only' => ['assign1stInterview']]),
-            new Middleware('permission:Candidate Approve 1st Interview', ['only' => ['approve1stInterview']]),
-            new Middleware('permission:Candidate Reject 1st Interview', ['only' => ['reject1stInterview']]),
-            new Middleware('permission:Candidate Assign 2nd Interview', ['only' => ['assign2ndInterview']]),
-            new Middleware('permission:Candidate Approve 2nd Interview', ['only' => ['approve2ndInterview']]),
-            new Middleware('permission:Candidate Reject 2nd Interview', ['only' => ['reject2ndInterview']]),
-            new Middleware('permission:Candidate Approve Final', ['only' => ['approveFinal']]),
-            new Middleware('permission:Candidate Reject Final', ['only' => ['rejectFinal']]),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List|Candidate Assigned List', ['index', 'getCandidateList']),
+            new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['show', 'getApprovals', 'getInterviewers', 'getDocuments']),
+            new Middleware('permission:Candidate Update|Candidate Assign 1st Interview', ['verifyDocuments', 'rejectDocuments', 'resendDocumentLink']),
+            new Middleware('permission:Candidate Create', ['store']),
+            new Middleware('permission:Candidate Update', ['update']),
+            new Middleware('permission:Candidate Delete', ['destroy']),
+            new Middleware('permission:Candidate Assign 1st Interview', ['assign1stInterview']),
+            new Middleware('permission:Candidate Approve 1st Interview', ['approve1stInterview']),
+            new Middleware('permission:Candidate Reject 1st Interview', ['reject1stInterview']),
+            new Middleware('permission:Candidate Assign 2nd Interview', ['assign2ndInterview']),
+            new Middleware('permission:Candidate Approve 2nd Interview', ['approve2ndInterview']),
+            new Middleware('permission:Candidate Reject 2nd Interview', ['reject2ndInterview']),
+            new Middleware('permission:Candidate Approve Final', ['approveFinal']),
+            new Middleware('permission:Candidate Reject Final', ['rejectFinal']),
         ];
     }
 
     /**
-     * Display a listing of candidates with search, filtering, and channel visibility scoping.
+     * Display a listing of candidates with search, filtering, and channel/stage visibility scoping.
      */
     public function index(Request $request)
     {
@@ -67,14 +73,24 @@ class CandidateController extends Controller implements HasMiddleware
                 $query->search($request->search);
             }
 
-            // Status filter
+            // Status filter (supports single status or comma-separated list e.g. 1st_interview_passed,2nd_interview)
             if ($request->filled('status')) {
                 $query->status($request->status);
+            }
+
+            // Workflow stage filter (1st_interview, 2nd_interview, final_approval)
+            if ($request->filled('stage')) {
+                $query->stage($request->stage);
             }
 
             // Designation filter
             if ($request->filled('designation_id')) {
                 $query->where('designation_id', $request->designation_id);
+            }
+
+            // Source filter (direct, referral)
+            if ($request->filled('source')) {
+                $query->source($request->source);
             }
 
             $candidates = $query->orderBy('created_at', 'desc')->paginate($perPage);
@@ -83,7 +99,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'GET_ALL',
                 'Candidate',
                 'Retrieved candidate listing',
-                $request->only(['search', 'status', 'designation_id', 'per_page', 'page'])
+                $request->only(['search', 'status', 'stage', 'designation_id', 'source', 'per_page', 'page'])
             );
 
             return response()->json([
@@ -116,7 +132,8 @@ class CandidateController extends Controller implements HasMiddleware
             }
 
             // 2. Set submission parameters
-            $data['status'] = 'pending';
+            $data['status'] = CandidateStatus::PENDING->value;
+            $data['source'] = $request->input('source', Candidate::SOURCE_REFERRAL);
             $data['submitted_at'] = now();
             $data['uploaded_by'] = $user->id;
 
@@ -147,6 +164,9 @@ class CandidateController extends Controller implements HasMiddleware
                     $headUser->notify(new CandidateSubmittedNotification($candidate));
                 }
             }
+
+            // 6. Send Document Upload Link SMS to Candidate
+            $this->sendDocumentUploadSms($candidate);
 
             $this->logActivity(
                 'CREATE',
@@ -314,8 +334,23 @@ class CandidateController extends Controller implements HasMiddleware
             $user = auth()->user();
             $query = Candidate::accessibleBy($user);
 
+            // Status filter (single or comma-separated)
+            if ($request->filled('status')) {
+                $query->status($request->status);
+            }
+
+            // Workflow stage filter (1st_interview, 2nd_interview, final_approval)
+            if ($request->filled('stage')) {
+                $query->stage($request->stage);
+            }
+
+            // Source filter (direct, referral)
+            if ($request->filled('source')) {
+                $query->source($request->source);
+            }
+
             $candidates = $query->orderBy('first_name', 'asc')
-                                ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id']);
+                                ->get(['id', 'first_name', 'last_name', 'nic_number', 'designation_id', 'status', 'source']);
 
             $this->logActivity('GET_LIST', 'Candidate', 'Retrieved candidate select box list');
 
@@ -329,6 +364,77 @@ class CandidateController extends Controller implements HasMiddleware
                 'status' => 'error',
                 'message' => 'Failed to retrieve candidate list',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get active users eligible for assignment as interviewers for a given workflow stage.
+     */
+    public function getInterviewers(Request $request)
+    {
+        try {
+            $stage = $request->get('stage', '2nd_interview');
+
+            $permission = match ($stage) {
+                '1st_interview'  => 'Candidate Approve 1st Interview',
+                '2nd_interview'  => 'Candidate Approve 2nd Interview',
+                'final_approval' => 'Candidate Approve Final',
+                default          => 'Candidate Approve 2nd Interview',
+            };
+
+            $query = User::where('is_active', true)
+                ->where(function ($q) use ($permission) {
+                    $q->permission($permission)
+                      ->orWhereHas('roles', function ($rq) {
+                          $rq->where('name', 'Super Admin');
+                      });
+                })
+                ->with([
+                    'employee:id,f_name,l_name,full_name,employee_code,designation_id,branch_id',
+                    'employee.designation:id,name',
+                    'employee.branch:id,name',
+                    'roles:id,name',
+                ]);
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('username', 'like', "%{$search}%")
+                      ->orWhereHas('employee', function ($eq) use ($search) {
+                          $eq->where('full_name', 'like', "%{$search}%")
+                             ->orWhere('employee_code', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            $users = $query->orderBy('name', 'asc')->get();
+
+            $data = $users->map(function ($u) {
+                return [
+                    'id'               => $u->id,
+                    'name'             => $u->name,
+                    'email'            => $u->email,
+                    'username'         => $u->username,
+                    'employee_id'      => $u->employee_id,
+                    'designation_name' => $u->employee?->designation?->name,
+                    'branch_name'      => $u->employee?->branch?->name,
+                    'roles'            => $u->roles->pluck('name'),
+                ];
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Interviewers retrieved successfully',
+                'data'    => $data,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to retrieve interviewers',
+                'error'   => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }
     }
@@ -358,10 +464,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['pending', '1st_interview'])) {
+            if (! in_array($candidate->status, [CandidateStatus::DOCUMENT_VERIFIED, CandidateStatus::FIRST_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be assigned at current stage (status: {$candidate->status})",
+                    'message' => "Candidate 1st interview can only be assigned after documents are verified. Current status: {$candidate->status->label()}",
                 ], 422);
             }
 
@@ -379,7 +485,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'              => 'pending',
             ]);
 
-            $candidate->status = '1st_interview';
+            $candidate->status = CandidateStatus::FIRST_INTERVIEW;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -437,10 +543,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['pending', '1st_interview'])) {
+            if (! in_array($candidate->status, [CandidateStatus::PENDING, CandidateStatus::FIRST_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "1st interview cannot be approved for candidate with status: {$candidate->status}",
+                    'message' => "1st interview cannot be approved for candidate with status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -457,7 +563,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'completed',
             ]);
 
-            $candidate->status = '1st_interview_passed';
+            $candidate->status = CandidateStatus::FIRST_INTERVIEW_PASSED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -515,10 +621,15 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (in_array($candidate->status, ['1st_interview_passed', '1st_interview_rejected', 'final_approved', 'rejected'])) {
+            if (in_array($candidate->status, [
+                CandidateStatus::FIRST_INTERVIEW_PASSED,
+                CandidateStatus::FIRST_INTERVIEW_REJECTED,
+                CandidateStatus::FINAL_APPROVED,
+                CandidateStatus::REJECTED,
+            ], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be rejected from status: {$candidate->status}",
+                    'message' => "Candidate cannot be rejected from status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -535,7 +646,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'rejected',
             ]);
 
-            $candidate->status = '1st_interview_rejected';
+            $candidate->status = CandidateStatus::FIRST_INTERVIEW_REJECTED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -638,10 +749,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['1st_interview_passed', '2nd_interview'])) {
+            if (! in_array($candidate->status, [CandidateStatus::FIRST_INTERVIEW_PASSED, CandidateStatus::SECOND_INTERVIEW], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate 2nd interview cannot be assigned at current status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview cannot be assigned at current status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -658,7 +769,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'              => 'pending',
             ]);
 
-            $candidate->status = '2nd_interview';
+            $candidate->status = CandidateStatus::SECOND_INTERVIEW;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -716,11 +827,20 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (! in_array($candidate->status, ['1st_interview_passed', '2nd_interview'])) {
+            if ($candidate->status !== CandidateStatus::SECOND_INTERVIEW) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "2nd interview cannot be approved for candidate with status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview must be assigned before approval. Current status: {$candidate->status->value}",
                 ], 422);
+            }
+
+            if (! $user->hasRole('Super Admin') && ! $candidate->isAssigned2ndInterviewer($user)) {
+                $this->logActivity('APPROVE_2ND_INTERVIEW_UNAUTHORIZED', 'Candidate', "Unauthorized 2nd interview approval attempt on candidate ID: {$id} by user ID: {$user->id}", ['candidate_id' => $candidate->id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only the assigned interviewer or Super Admin can approve this 2nd interview.',
+                ], 403);
             }
 
             $data = $request->validated();
@@ -735,7 +855,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'completed',
             ]);
 
-            $candidate->status = '2nd_interview_passed';
+            $candidate->status = CandidateStatus::SECOND_INTERVIEW_PASSED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -793,11 +913,20 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (in_array($candidate->status, ['2nd_interview_passed', '2nd_interview_rejected', 'final_approved', 'rejected'])) {
+            if ($candidate->status !== CandidateStatus::SECOND_INTERVIEW) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be rejected from status: {$candidate->status}",
+                    'message' => "Candidate 2nd interview must be assigned before rejection. Current status: {$candidate->status->value}",
                 ], 422);
+            }
+
+            if (! $user->hasRole('Super Admin') && ! $candidate->isAssigned2ndInterviewer($user)) {
+                $this->logActivity('REJECT_2ND_INTERVIEW_UNAUTHORIZED', 'Candidate', "Unauthorized 2nd interview rejection attempt on candidate ID: {$id} by user ID: {$user->id}", ['candidate_id' => $candidate->id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only the assigned interviewer or Super Admin can reject this 2nd interview.',
+                ], 403);
             }
 
             $data = $request->validated();
@@ -812,7 +941,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'rejected',
             ]);
 
-            $candidate->status = '2nd_interview_rejected';
+            $candidate->status = CandidateStatus::SECOND_INTERVIEW_REJECTED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -871,10 +1000,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if ($candidate->status !== '2nd_interview_passed') {
+            if ($candidate->status !== CandidateStatus::SECOND_INTERVIEW_PASSED) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate final approval requires '2nd_interview_passed' status. Current status: {$candidate->status}",
+                    'message' => "Candidate final approval requires '2nd_interview_passed' status. Current status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -890,7 +1019,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'completed',
             ]);
 
-            $candidate->status = 'final_approved';
+            $candidate->status = CandidateStatus::FINAL_APPROVED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -948,10 +1077,10 @@ class CandidateController extends Controller implements HasMiddleware
                 ], 403);
             }
 
-            if (in_array($candidate->status, ['final_approved', 'rejected'])) {
+            if (in_array($candidate->status, [CandidateStatus::FINAL_APPROVED, CandidateStatus::REJECTED], true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Candidate cannot be rejected from final closed status: {$candidate->status}",
+                    'message' => "Candidate cannot be rejected from final closed status: {$candidate->status->value}",
                 ], 422);
             }
 
@@ -967,7 +1096,7 @@ class CandidateController extends Controller implements HasMiddleware
                 'status'         => 'rejected',
             ]);
 
-            $candidate->status = 'rejected';
+            $candidate->status = CandidateStatus::REJECTED;
             $candidate->stage_updated_at = now();
             $candidate->save();
 
@@ -996,6 +1125,275 @@ class CandidateController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to reject candidate',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Retrieve all uploaded documents for a candidate with document specifications.
+     */
+    public function getDocuments(string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents',
+                ], 403);
+            }
+
+            $documents = CandidateDocument::with([
+                'documentType:id,document_name,slug,description,is_required',
+                'verifiedByUser:id,name,email',
+            ])->where('candidate_id', $candidate->id)->get();
+
+            $allDocTypes = DocumentType::active()->get();
+            $uploadedDocTypeIds = $documents->pluck('document_type_id')->toArray();
+            $missingRequired = $allDocTypes->where('is_required', true)
+                ->reject(fn ($dt) => in_array($dt->id, $uploadedDocTypeIds))
+                ->values();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate documents retrieved successfully',
+                'data' => [
+                    'candidate_id'     => $candidate->id,
+                    'candidate_code'   => $candidate->candidate_code,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'documents'        => $documents,
+                    'missing_required' => $missingRequired,
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve candidate documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Staff verification of candidate documents (moves candidate to 'document_verified').
+     */
+    public function verifyDocuments(Request $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents',
+                ], 403);
+            }
+
+            $query = CandidateDocument::where('candidate_id', $candidate->id);
+            if ($request->filled('document_ids') && is_array($request->document_ids)) {
+                $query->whereIn('id', $request->document_ids);
+            }
+
+            $query->update([
+                'status'           => 'verified',
+                'verified_by'      => $user->id,
+                'verified_at'      => now(),
+                'rejection_reason' => null,
+            ]);
+
+            // Check if all mandatory active document types are now verified
+            $verifiedDocTypeIds = CandidateDocument::where('candidate_id', $candidate->id)
+                ->where('status', 'verified')
+                ->pluck('document_type_id')
+                ->toArray();
+
+            $requiredDocTypeIds = DocumentType::active()->required()->pluck('id')->toArray();
+            $allRequiredVerified = count(array_diff($requiredDocTypeIds, $verifiedDocTypeIds)) === 0;
+
+            if ($allRequiredVerified) {
+                $candidate->status = CandidateStatus::DOCUMENT_VERIFIED;
+                $candidate->stage_updated_at = now();
+                $candidate->save();
+            }
+
+            $this->logActivity(
+                'VERIFY_DOCUMENTS',
+                'Candidate',
+                "Verified onboarding documents for candidate {$candidate->full_name} (Code: {$candidate->candidate_code})",
+                [
+                    'candidate_id' => $candidate->id,
+                    'new_status'   => $candidate->status->value,
+                ]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $allRequiredVerified
+                    ? 'All required documents verified successfully. Candidate is now ready for 1st Interview!'
+                    : 'Documents verified. Some required documents are still pending verification.',
+                'data' => [
+                    'candidate_id'     => $candidate->id,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'documents'        => CandidateDocument::with('documentType:id,document_name,slug,is_required')
+                        ->where('candidate_id', $candidate->id)->get(),
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to verify candidate documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Staff rejection of candidate document(s) with reason (moves candidate to 'document_rejected' and regenerates link).
+     */
+    public function rejectDocuments(Request $request, string $id)
+    {
+        $request->validate([
+            'rejections'                  => 'required|array|min:1',
+            'rejections.*.document_id'    => 'required|integer|exists:candidate_documents,id',
+            'rejections.*.reason'         => 'required|string|max:500',
+        ]);
+
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents',
+                ], 403);
+            }
+
+            foreach ($request->rejections as $rej) {
+                CandidateDocument::where('id', $rej['document_id'])
+                    ->where('candidate_id', $candidate->id)
+                    ->update([
+                        'status'           => 'rejected',
+                        'rejection_reason' => $rej['reason'],
+                        'verified_by'      => $user->id,
+                        'verified_at'      => now(),
+                    ]);
+            }
+
+            // Regenerate upload token and set status to document_rejected
+            $candidate->document_upload_token = \Illuminate\Support\Str::random(40);
+            $candidate->status = CandidateStatus::DOCUMENT_REJECTED;
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            // Trigger re-upload link SMS
+            $this->sendDocumentUploadSms($candidate);
+
+            $this->logActivity(
+                'REJECT_DOCUMENTS',
+                'Candidate',
+                "Rejected document(s) for candidate {$candidate->full_name}. Re-upload requested.",
+                ['candidate_id' => $candidate->id, 'new_status' => CandidateStatus::DOCUMENT_REJECTED->value],
+                'warning'
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Documents rejected. A new upload link has been dispatched to candidate mobile.',
+                'data' => [
+                    'candidate_id'     => $candidate->id,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'upload_token'     => $candidate->document_upload_token,
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reject documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Resend document upload link SMS to candidate.
+     */
+    public function resendDocumentLink(string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate record',
+                ], 403);
+            }
+
+            if (empty($candidate->document_upload_token)) {
+                $candidate->document_upload_token = \Illuminate\Support\Str::random(40);
+                $candidate->save();
+            }
+
+            $sent = $this->sendDocumentUploadSms($candidate);
+
+            $this->logActivity(
+                'RESEND_DOCUMENT_LINK',
+                'Candidate',
+                "Resent document upload link to candidate {$candidate->full_name}",
+                ['candidate_id' => $candidate->id, 'phone_number' => $candidate->phone_number]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $sent
+                    ? 'Document upload link SMS resent successfully.'
+                    : 'Document upload link generated, but SMS gateway did not confirm dispatch.',
+                'data' => [
+                    'candidate_code' => $candidate->candidate_code,
+                    'upload_url'     => $candidate->getDocumentUploadUrl(),
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to resend document link',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }

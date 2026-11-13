@@ -21,11 +21,11 @@ class ProvinceController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Province Index', ['only' => ['index', 'show']]),
-            new Middleware('permission:Province Create', ['only' => ['store']]),
-            new Middleware('permission:Province Update', ['only' => ['update']]),
-            new Middleware('permission:Province Delete', ['only' => ['destroy']]),
-            new Middleware('permission:Province Toggle Status', ['only' => ['toggleStatus']]),
+            new Middleware('permission:Province Index', ['index', 'show']),
+            new Middleware('permission:Province Create', ['store']),
+            new Middleware('permission:Province Update', ['update']),
+            new Middleware('permission:Province Delete', ['destroy']),
+            new Middleware('permission:Province Toggle Status', ['toggleStatus']),
         ];
     }
 

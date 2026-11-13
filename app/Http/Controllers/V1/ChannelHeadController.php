@@ -20,8 +20,8 @@ class ChannelHeadController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Channel Head Index',  ['only' => ['getCurrentHead', 'getHistory']]),
-            new Middleware('permission:Channel Head Assign', ['only' => ['assignHead']]),
+            new Middleware('permission:Channel Head Index',  ['getCurrentHead', 'getHistory']),
+            new Middleware('permission:Channel Head Assign', ['assignHead']),
         ];
     }
 

@@ -19,7 +19,7 @@ class ActivityLogController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Activity Log Index', ['only' => ['index', 'show']]),
+            new Middleware('permission:Activity Log Index', ['index', 'show']),
         ];
     }
 

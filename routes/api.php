@@ -12,3 +12,6 @@ Route::get('/health-check', function () {
 /* version 1 routes */
 require __DIR__ . '/v1.php';
 
+/* external / public portal routes */
+require __DIR__ . '/external.php';
+
