@@ -520,4 +520,41 @@ class UserController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function completeTour()
+    {
+        try {
+            $user = auth('api')->user();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
+            $user->user_tour = false;
+            $user->save();
+
+            $this->logActivity('COMPLETE_TOUR', 'User', "Completed onboarding tour for user: {$user->username}", [
+                'user_id' => $user->id,
+                'user_tour' => false,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'User tour completed successfully',
+                'data' => [
+                    'id' => $user->id,
+                    'user_tour' => $user->user_tour,
+                ]
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to complete user tour',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
 }

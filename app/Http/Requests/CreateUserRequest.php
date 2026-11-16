@@ -45,6 +45,7 @@ class CreateUserRequest extends FormRequest
 
             'is_active' => 'sometimes|boolean',
             'can_login' => 'sometimes|boolean',
+            'user_tour' => 'sometimes|boolean',
         ];
     }
 
