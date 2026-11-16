@@ -152,6 +152,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
         Route::get('{id}/documents', [CandidateController::class, 'getDocuments']);
         Route::post('{id}/documents/verify', [CandidateController::class, 'verifyDocuments']);
         Route::post('{id}/documents/reject', [CandidateController::class, 'rejectDocuments']);
+        Route::post('{id}/documents/reject-fully', [CandidateController::class, 'rejectDocumentsFully']);
         Route::post('{id}/resend-document-link', [CandidateController::class, 'resendDocumentLink']);
 
         // Stage 1

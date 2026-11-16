@@ -100,6 +100,21 @@ it('reports unknown manager codes and self-references as row errors', function (
         ->and($results['errors'][1]['error'])->toContain('cannot reference itself');
 });
 
+it('creates an employee without date_of_birth', function () {
+    $designation = seedDesignation();
+
+    $csv = "employee_code,f_name,l_name,full_name,name_with_initials,designation_id,employee_type,id_type,id_number,email,phone_primary\n"
+        ."EMP040,New,Person,New Person,N. Person,{$designation->id},permanent,nic,199099999999,emp040@cdp.lk,0771234567\n";
+    $results = app(BulkImportService::class)->import(makeImportCsv('employees', $csv), 'employees');
+
+    $employee = Employee::where('employee_code', 'EMP040')->first();
+
+    expect($results['imported'])->toBe(1)
+        ->and($results['failed'])->toBe(0)
+        ->and($employee)->not->toBeNull()
+        ->and($employee->date_of_birth)->toBeNull();
+});
+
 it('matches rows by id and updates the reporting manager', function () {
     $designation = seedDesignation();
     $manager = seedEmployee('MGR001', $designation);

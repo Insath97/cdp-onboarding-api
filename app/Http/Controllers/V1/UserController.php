@@ -138,7 +138,7 @@ class UserController extends Controller implements HasMiddleware
                     'employee_type' => $request->input('employee_type', 'permanent'),
                     'id_type' => $request->input('id_type', 'nic'),
                     'id_number' => $data['id_number'],
-                    'date_of_birth' => $request->input('date_of_birth', '2000-01-01'),
+                    'date_of_birth' => $request->input('date_of_birth'),
                     'email' => $data['email'] ?? ($data['id_number'] . '@example.com'),
                     'phone' => $data['phone'] ?? null,
                     'phone_primary' => $data['phone'] ?? '0000000000',
@@ -353,7 +353,7 @@ class UserController extends Controller implements HasMiddleware
                     // Create new employee if they were previously an admin
                     $employeeData['employee_type'] = $request->input('employee_type', 'permanent');
                     $employeeData['id_type'] = $request->input('id_type', 'nic');
-                    $employeeData['date_of_birth'] = $request->input('date_of_birth', '2000-01-01');
+                    $employeeData['date_of_birth'] = $request->input('date_of_birth');
                     if (!isset($employeeData['phone_primary'])) {
                         $employeeData['phone_primary'] = '0000000000';
                     }

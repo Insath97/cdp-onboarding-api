@@ -8,6 +8,7 @@ enum CandidateStatus: string
     case DOCUMENT_SUBMITTED = 'document_submitted';
     case DOCUMENT_VERIFIED = 'document_verified';
     case DOCUMENT_REJECTED = 'document_rejected';
+    case DOCUMENT_FULLY_REJECTED = 'document_fully_rejected';
     case FIRST_INTERVIEW = '1st_interview';
     case FIRST_INTERVIEW_PASSED = '1st_interview_passed';
     case FIRST_INTERVIEW_REJECTED = '1st_interview_rejected';
@@ -27,6 +28,7 @@ enum CandidateStatus: string
             self::DOCUMENT_SUBMITTED => 'Documents Submitted',
             self::DOCUMENT_VERIFIED => 'Documents Verified',
             self::DOCUMENT_REJECTED => 'Documents Rejected',
+            self::DOCUMENT_FULLY_REJECTED => 'Documents Fully Rejected',
             self::FIRST_INTERVIEW => '1st Interview',
             self::FIRST_INTERVIEW_PASSED => '1st Interview Passed',
             self::FIRST_INTERVIEW_REJECTED => '1st Interview Rejected',
@@ -48,6 +50,7 @@ enum CandidateStatus: string
             self::DOCUMENT_SUBMITTED,
             self::DOCUMENT_VERIFIED,
             self::DOCUMENT_REJECTED,
+            self::DOCUMENT_FULLY_REJECTED,
             self::FIRST_INTERVIEW,
             self::FIRST_INTERVIEW_REJECTED => '1st_interview',
 
@@ -85,6 +88,7 @@ enum CandidateStatus: string
                 self::DOCUMENT_SUBMITTED->value,
                 self::DOCUMENT_VERIFIED->value,
                 self::DOCUMENT_REJECTED->value,
+                self::DOCUMENT_FULLY_REJECTED->value,
                 self::FIRST_INTERVIEW->value,
                 self::FIRST_INTERVIEW_REJECTED->value,
             ],
@@ -115,6 +119,7 @@ enum CandidateStatus: string
             self::DOCUMENT_SUBMITTED->value,
             self::DOCUMENT_VERIFIED->value,
             self::DOCUMENT_REJECTED->value,
+            self::DOCUMENT_FULLY_REJECTED->value,
             self::FIRST_INTERVIEW->value,
         ];
     }
@@ -173,6 +178,7 @@ enum CandidateStatus: string
     public function isTerminal(): bool
     {
         return in_array($this, [
+            self::DOCUMENT_FULLY_REJECTED,
             self::FIRST_INTERVIEW_REJECTED,
             self::SECOND_INTERVIEW_REJECTED,
             self::FINAL_APPROVED,
@@ -207,6 +213,7 @@ enum CandidateStatus: string
     public static function terminalStatuses(): array
     {
         return [
+            self::DOCUMENT_FULLY_REJECTED->value,
             self::FIRST_INTERVIEW_REJECTED->value,
             self::SECOND_INTERVIEW_REJECTED->value,
             self::FINAL_APPROVED->value,
