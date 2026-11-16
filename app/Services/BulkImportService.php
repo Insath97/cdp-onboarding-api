@@ -117,7 +117,7 @@ class BulkImportService
                     'branch_id' => ['model' => Branch::class, 'foreign_key' => 'branch_id'],
                     'department_id' => ['model' => Department::class, 'foreign_key' => 'department_id'],
                     'designation_id' => ['model' => Designation::class, 'foreign_key' => 'designation_id'],
-                    'reporting_manager_id' => ['model' => Employee::class, 'foreign_key' => 'reporting_manager_id'],
+                    'reporting_manager_id' => ['model' => Employee::class, 'foreign_key' => 'reporting_manager_id', 'lookup_key' => 'employee_code'],
                 ],
                 'fillable' => [
                     'f_name', 'l_name', 'full_name', 'name_with_initials', 'employee_code',
@@ -188,6 +188,7 @@ class BulkImportService
         $headers = array_map('trim', $headers);
 
         $rowNumber = 1;
+        $pendingRefs = [];
         while (($rowData = fgetcsv($handle)) !== false) {
             $rowNumber++;
             $results['total']++;
@@ -210,7 +211,7 @@ class BulkImportService
 
             DB::beginTransaction();
             try {
-                $this->processGenericRow($config, $data);
+                $this->processGenericRow($config, $data, $pendingRefs, $rowNumber);
                 DB::commit();
                 $results['imported']++;
             } catch (\Throwable $e) {
@@ -231,6 +232,9 @@ class BulkImportService
         }
 
         fclose($handle);
+
+        // Second pass: resolve deferred self-referencing dependencies (e.g. reporting_manager_id)
+        $this->resolvePendingSelfReferences($config, $results, $pendingRefs);
 
         $this->logActivity(
             'BULK_IMPORT_SUCCESS',
@@ -360,32 +364,59 @@ class BulkImportService
 
     /**
      * Process single row using configuration and database ID validation.
+     * Self-referencing dependencies (dependency model === import model) are
+     * deferred to a second pass so rows can reference rows imported later in the file.
      */
-    protected function processGenericRow(array $config, array $data): void
+    protected function processGenericRow(array $config, array $data, array &$pendingRefs = [], int $rowNumber = 0): void
     {
         $modelClass = $config['model'];
         $uniqueKeyField = $config['unique_key'];
+
+        // Ignore empty cells: they mean "leave the existing value untouched" on update
+        $data = array_filter($data, fn ($value) => $value !== null);
 
         // Fallback unique key resolution
         if (! isset($data[$uniqueKeyField]) || $data[$uniqueKeyField] === '') {
             if (isset($data['id']) && $data['id'] !== '') {
                 $uniqueKeyField = 'id';
+            } else {
+                throw new \Exception("Missing unique identifier '{$uniqueKeyField}' (and no 'id' column) in row data.");
             }
-        }
-
-        if (! isset($data[$uniqueKeyField])) {
-            throw new \Exception("Missing unique identifier '{$uniqueKeyField}' in row data.");
         }
 
         // Validate Foreign Key Dependencies (Database IDs)
         if (isset($config['dependencies'])) {
             foreach ($config['dependencies'] as $foreignKey => $dep) {
-                if (! empty($data[$foreignKey])) {
-                    $idVal = (int) $data[$foreignKey];
-                    $exists = $dep['model']::where('id', $idVal)->exists();
-                    if (! $exists) {
-                        throw new \Exception("Invalid foreign key reference: {$foreignKey} with ID '{$idVal}' does not exist in database.");
+                if (empty($data[$foreignKey])) {
+                    continue;
+                }
+
+                // Defer self-referencing dependencies to the second pass
+                if ($dep['model'] === $config['model']) {
+                    $pendingRefs[] = [
+                        'row' => $rowNumber,
+                        'key_field' => $uniqueKeyField,
+                        'key' => $data[$uniqueKeyField],
+                        'field' => $foreignKey,
+                        'value' => trim((string) $data[$foreignKey]),
+                        'lookup_key' => $dep['lookup_key'] ?? 'id',
+                    ];
+                    unset($data[$foreignKey]);
+
+                    continue;
+                }
+
+                $idVal = (int) $data[$foreignKey];
+                $exists = $dep['model']::where('id', $idVal)->exists();
+                if (! $exists && isset($dep['lookup_key'])) {
+                    $resolved = $dep['model']::where($dep['lookup_key'], trim((string) $data[$foreignKey]))->first();
+                    if ($resolved) {
+                        $data[$foreignKey] = $resolved->id;
+                        $exists = true;
                     }
+                }
+                if (! $exists) {
+                    throw new \Exception("Invalid foreign key reference: {$foreignKey} with ID '{$idVal}' does not exist in database.");
                 }
             }
         }
@@ -428,6 +459,60 @@ class BulkImportService
                 throw new \Exception('Database foreign key integrity constraint violation. Please check that referenced parent IDs exist.');
             }
             throw $e;
+        }
+    }
+
+    /**
+     * Second import pass: resolve deferred self-referencing dependencies now that
+     * every row from the file exists in the database.
+     */
+    protected function resolvePendingSelfReferences(array $config, array &$results, array $pendingRefs): void
+    {
+        if (empty($pendingRefs)) {
+            return;
+        }
+
+        $modelClass = $config['model'];
+
+        foreach ($pendingRefs as $ref) {
+            try {
+                $parent = null;
+                if ($ref['lookup_key'] === 'id' || ctype_digit((string) $ref['value'])) {
+                    $parent = $modelClass::find((int) $ref['value']);
+                }
+                if (! $parent && $ref['lookup_key'] !== 'id') {
+                    $parent = $modelClass::where($ref['lookup_key'], $ref['value'])->first();
+                }
+
+                if (! $parent) {
+                    throw new \Exception("Invalid foreign key reference: {$ref['field']} '{$ref['value']}' does not exist in database.");
+                }
+
+                $row = $modelClass::where($ref['key_field'], $ref['key'])->first();
+                if (! $row) {
+                    throw new \Exception("Row with {$ref['key_field']} '{$ref['key']}' not found while resolving {$ref['field']}.");
+                }
+
+                if ((int) $row->id === (int) $parent->id) {
+                    throw new \Exception("Self-reference detected: {$ref['key_field']} '{$ref['key']}' cannot reference itself in {$ref['field']}.");
+                }
+
+                $row->update([$ref['field'] => $parent->id]);
+            } catch (\Throwable $e) {
+                $results['imported'] = max(0, $results['imported'] - 1);
+                $results['failed']++;
+                $results['errors'][] = [
+                    'row' => $ref['row'],
+                    'error' => $e->getMessage(),
+                ];
+                $this->logActivity(
+                    'BULK_IMPORT_ROW_FAILED',
+                    'BulkImport',
+                    "Import failed while resolving {$ref['field']} for {$ref['key_field']} '{$ref['key']}' at row {$ref['row']}: ".$e->getMessage(),
+                    ['table' => $config['model'], 'row' => $ref['row'], 'error' => $e->getMessage()],
+                    'error'
+                );
+            }
         }
     }
 
