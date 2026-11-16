@@ -14,6 +14,7 @@ use App\Http\Requests\Approve2ndInterviewRequest;
 use App\Http\Requests\Reject2ndInterviewRequest;
 use App\Http\Requests\ApproveFinalRequest;
 use App\Http\Requests\RejectFinalRequest;
+use App\Http\Requests\RejectDocumentsFullyRequest;
 use App\Models\Candidate;
 use App\Models\CandidateDocument;
 use App\Models\ChannelHeadHistory;
@@ -42,7 +43,7 @@ class CandidateController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final|Candidate 2nd Interview List|Candidate Assigned List', ['index', 'getCandidateList']),
             new Middleware('permission:Candidate Index|Candidate Show|Candidate Assign 1st Interview|Candidate Approve 1st Interview|Candidate Assign 2nd Interview|Candidate Approve 2nd Interview|Candidate Approve Final', ['show', 'getApprovals', 'getInterviewers', 'getDocuments']),
-            new Middleware('permission:Candidate Update|Candidate Assign 1st Interview', ['verifyDocuments', 'rejectDocuments', 'resendDocumentLink']),
+            new Middleware('permission:Candidate Update|Candidate Assign 1st Interview', ['verifyDocuments', 'rejectDocuments', 'rejectDocumentsFully', 'resendDocumentLink']),
             new Middleware('permission:Candidate Create', ['store']),
             new Middleware('permission:Candidate Update', ['update']),
             new Middleware('permission:Candidate Delete', ['destroy']),
@@ -1338,6 +1339,125 @@ class CandidateController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to reject documents',
+                'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Staff permanent rejection of candidate at document verification stage.
+     * Moves candidate to 'document_fully_rejected', clears document upload token,
+     * and does NOT send any re-upload link.
+     */
+    public function rejectDocumentsFully(RejectDocumentsFullyRequest $request, string $id)
+    {
+        try {
+            $candidate = Candidate::find($id);
+
+            if (! $candidate) {
+                $this->logActivity('REJECT_DOCUMENTS_FULLY_FAILED', 'Candidate', "Candidate not found with ID: {$id}", ['id' => $id], 'warning');
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Candidate not found',
+                ], 404);
+            }
+
+            $user = auth()->user();
+            if (! $candidate->isAccessibleBy($user)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized access to candidate documents outside your channel or hierarchy',
+                ], 403);
+            }
+
+            if ($candidate->status->isTerminal()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Candidate cannot be rejected from terminal status: {$candidate->status->value}",
+                ], 422);
+            }
+
+            $data = $request->validated();
+            $comments = $data['comments'];
+            $rejectionDate = $data['rejection_date'];
+
+            // Update specific documents if provided, otherwise update pending documents
+            if (! empty($data['rejections'])) {
+                foreach ($data['rejections'] as $rej) {
+                    CandidateDocument::where('id', $rej['document_id'])
+                        ->where('candidate_id', $candidate->id)
+                        ->update([
+                            'status'           => 'rejected',
+                            'rejection_reason' => $rej['reason'],
+                            'verified_by'      => $user->id,
+                            'verified_at'      => now(),
+                        ]);
+                }
+            } else {
+                CandidateDocument::where('candidate_id', $candidate->id)
+                    ->whereIn('status', ['pending', 'rejected'])
+                    ->update([
+                        'status'           => 'rejected',
+                        'rejection_reason' => $comments,
+                        'verified_by'      => $user->id,
+                        'verified_at'      => now(),
+                    ]);
+            }
+
+            // Invalidate/clear document upload token so candidate can no longer access upload portal
+            $candidate->document_upload_token = null;
+            $candidate->status = CandidateStatus::DOCUMENT_FULLY_REJECTED;
+            $candidate->stage_updated_at = now();
+            $candidate->save();
+
+            // Record interview/workflow approval history
+            InterviewApproval::create([
+                'candidate_id'   => $candidate->id,
+                'actor_id'       => $user->id,
+                'stage'          => 'document_verification',
+                'action'         => 'rejected',
+                'interview_date' => $rejectionDate,
+                'comments'       => $comments,
+                'status'         => 'rejected',
+            ]);
+
+            // Dispatch notification to candidate uploader
+            $uploader = User::find($candidate->uploaded_by);
+            if ($uploader) {
+                $uploader->notify(new CandidateStageStatusNotification($candidate, 'rejected', 'document_verification', $user, $comments));
+            }
+
+            $candidate->load(['designation', 'uploader:id,name,email', 'channelHead:id,first_name,last_name', 'approvals.actor:id,name,email']);
+
+            $this->logActivity(
+                'REJECT_DOCUMENTS_FULLY',
+                'Candidate',
+                "Candidate {$candidate->full_name} permanently rejected at document stage: {$comments}",
+                [
+                    'candidate_id'   => $candidate->id,
+                    'new_status'     => CandidateStatus::DOCUMENT_FULLY_REJECTED->value,
+                    'rejection_date' => $rejectionDate,
+                    'comments'       => $comments,
+                ],
+                'warning'
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate application has been fully rejected. No resubmit link was issued.',
+                'data' => [
+                    'candidate'        => $candidate,
+                    'candidate_id'     => $candidate->id,
+                    'candidate_status' => $candidate->status->value,
+                    'status_label'     => $candidate->status->label(),
+                    'upload_token'     => $candidate->document_upload_token,
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fully reject candidate documents',
                 'error' => config('app.debug') ? $th->getMessage() : 'Internal server error',
             ], 500);
         }

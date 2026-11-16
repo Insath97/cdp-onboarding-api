@@ -38,6 +38,7 @@ class DashboardService
         );
         $hired = (int) ($statusCounts[CandidateStatus::FINAL_APPROVED->value] ?? 0);
         $rejected = (int) (
+            ($statusCounts[CandidateStatus::DOCUMENT_FULLY_REJECTED->value] ?? 0) +
             ($statusCounts[CandidateStatus::FIRST_INTERVIEW_REJECTED->value] ?? 0) +
             ($statusCounts[CandidateStatus::SECOND_INTERVIEW_REJECTED->value] ?? 0) +
             ($statusCounts[CandidateStatus::REJECTED->value] ?? 0)
