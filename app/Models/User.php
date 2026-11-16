@@ -27,11 +27,21 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         'employee_id',
         'is_active',
         'can_login',
+        'user_tour',
         'last_login_at',
         'last_login_ip',
         'email_verified_at',
         'email_verification_token',
         'email_verification_token_expires_at',
+    ];
+
+    /**
+     * The model's default values for attributes.
+     *
+     * @var array
+     */
+    protected $attributes = [
+        'user_tour' => true,
     ];
 
     /**
@@ -58,6 +68,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
             'can_login' => 'boolean',
+            'user_tour' => 'boolean',
         ];
     }
 

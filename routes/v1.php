@@ -44,6 +44,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('roles/list', [RoleController::class, 'getAvailableRoles']);
     Route::apiResource('roles', RoleController::class);
 
+    Route::patch('users/complete-tour', [UserController::class, 'completeTour']);
     Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::apiResource('users', UserController::class);
 
