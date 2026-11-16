@@ -39,7 +39,7 @@ return new class extends Migration
             $table->string('state')->nullable();
             $table->string('country')->default('Sri Lanka');
             $table->string('postal_code')->nullable();
-            $table->string('phone_primary');
+            $table->string('phone_primary')->nullable();
             $table->string('phone_secondary')->nullable();
             $table->boolean('have_whatsapp')->default(false);
             $table->string('whatsapp_number')->nullable();

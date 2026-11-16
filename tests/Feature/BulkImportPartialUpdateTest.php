@@ -115,6 +115,21 @@ it('creates an employee without date_of_birth', function () {
         ->and($employee->date_of_birth)->toBeNull();
 });
 
+it('creates an employee without phone_primary', function () {
+    $designation = seedDesignation();
+
+    $csv = "employee_code,f_name,l_name,full_name,name_with_initials,designation_id,employee_type,id_type,id_number,email,date_of_birth\n"
+        ."EMP050,New,Person,New Person,N. Person,{$designation->id},permanent,nic,199088888888,emp050@cdp.lk,1995-03-15\n";
+    $results = app(BulkImportService::class)->import(makeImportCsv('employees', $csv), 'employees');
+
+    $employee = Employee::where('employee_code', 'EMP050')->first();
+
+    expect($results['imported'])->toBe(1)
+        ->and($results['failed'])->toBe(0)
+        ->and($employee)->not->toBeNull()
+        ->and($employee->phone_primary)->toBeNull();
+});
+
 it('matches rows by id and updates the reporting manager', function () {
     $designation = seedDesignation();
     $manager = seedEmployee('MGR001', $designation);
