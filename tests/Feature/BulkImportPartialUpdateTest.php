@@ -99,3 +99,20 @@ it('reports unknown manager codes and self-references as row errors', function (
         ->and($results['errors'][0]['error'])->toContain('does not exist')
         ->and($results['errors'][1]['error'])->toContain('cannot reference itself');
 });
+
+it('matches rows by id and updates the reporting manager', function () {
+    $designation = seedDesignation();
+    $manager = seedEmployee('MGR001', $designation);
+    $employee = seedEmployee('EMP030', $designation);
+
+    $csv = "id,reporting_manager_id\n"
+        ."{$employee->id},MGR001\n";
+    $results = app(BulkImportService::class)->import(makeImportCsv('employees', $csv), 'employees');
+
+    $employee->refresh();
+
+    expect($results['imported'])->toBe(1)
+        ->and($results['failed'])->toBe(0)
+        ->and($employee->reporting_manager_id)->toBe($manager->id)
+        ->and($employee->email)->toBe('emp030@cdp.lk');
+});
