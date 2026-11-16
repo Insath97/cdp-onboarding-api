@@ -141,7 +141,7 @@ class UserController extends Controller implements HasMiddleware
                     'date_of_birth' => $request->input('date_of_birth'),
                     'email' => $data['email'] ?? ($data['id_number'] . '@example.com'),
                     'phone' => $data['phone'] ?? null,
-                    'phone_primary' => $data['phone'] ?? '0000000000',
+                    'phone_primary' => $data['phone'] ?? null,
                     'branch_id' => $data['branch_id'] ?? null,
                     'zonal_id' => $data['zonal_id'] ?? null,
                     'region_id' => $data['region_id'] ?? null,
@@ -354,9 +354,6 @@ class UserController extends Controller implements HasMiddleware
                     $employeeData['employee_type'] = $request->input('employee_type', 'permanent');
                     $employeeData['id_type'] = $request->input('id_type', 'nic');
                     $employeeData['date_of_birth'] = $request->input('date_of_birth');
-                    if (!isset($employeeData['phone_primary'])) {
-                        $employeeData['phone_primary'] = '0000000000';
-                    }
                     if (isset($data['email'])) {
                          $employeeData['email'] = $data['email'];
                     } else {
