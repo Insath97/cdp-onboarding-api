@@ -525,7 +525,7 @@ class BulkImportService
         $list = [];
 
         foreach ($configs as $table => $config) {
-            $headers = $config['fillable'];
+            $headers = array_merge(['id'], $config['fillable']);
             if (isset($config['special_fields'])) {
                 $headers = array_merge($headers, $config['special_fields']);
             }
@@ -552,7 +552,7 @@ class BulkImportService
         }
 
         $config = $configs[$table];
-        $headers = $config['fillable'];
+        $headers = array_merge(['id'], $config['fillable']);
         if (isset($config['special_fields'])) {
             $headers = array_merge($headers, $config['special_fields']);
         }
@@ -631,6 +631,8 @@ class BulkImportService
             'can_login' => '1',
             'role' => 'Super Admin',
         ];
+
+        $sampleData = ['id' => ''] + $sampleData;
 
         $sampleRow = [];
         foreach ($headers as $header) {
