@@ -139,7 +139,7 @@ class UserController extends Controller implements HasMiddleware
                     'id_type' => $request->input('id_type', 'nic'),
                     'id_number' => $data['id_number'],
                     'date_of_birth' => $request->input('date_of_birth'),
-                    'email' => $data['email'] ?? ($data['id_number'] . '@example.com'),
+                    'email' => $data['email'] ?? null,
                     'phone' => $data['phone'] ?? null,
                     'phone_primary' => $data['phone'] ?? null,
                     'branch_id' => $data['branch_id'] ?? null,
@@ -357,7 +357,7 @@ class UserController extends Controller implements HasMiddleware
                     if (isset($data['email'])) {
                          $employeeData['email'] = $data['email'];
                     } else {
-                         $employeeData['email'] = ($data['id_number'] ?? $user->username) . '@example.com';
+                         $employeeData['email'] = null;
                     }
 
                     $employee = Employee::create($employeeData);
